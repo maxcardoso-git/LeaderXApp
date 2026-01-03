@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// APPROVALS
+// ============================================
+
+model Approval {
+  id              String    @id @default(uuid())
+  type            String
+  state           String    @default("PENDING")
+  candidateId     String    @map("candidate_id")
+  candidateName   String?   @map("candidate_name")
+  priority        String    @default("MEDIUM")
+  tenantId        String    @map("tenant_id")
+  orgId           String    @map("org_id")
+  cycleId         String?   @map("cycle_id")
+  metadata        Json?
+  decidedAt       DateTime? @map("decided_at")
+  decidedBy       String?   @map("decided_by")
+  decisionReason  String?   @map("decision_reason")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  @@index([tenantId, orgId])
+  @@index([tenantId, state])
+  @@index([tenantId, candidateId])
+  @@index([tenantId, cycleId])
+  @@index([createdAt])
+  @@map("approvals")
+}
+
+// ============================================
+// CANDIDATES (for Points calculation)
+// ============================================
+
+model Candidate {
+  id          String   @id @default(uuid())
+  name        String
+  email       String?
+  tenantId    String   @map("tenant_id")
+  orgId       String   @map("org_id")
+  score       Float    @default(0)
+  rank        Int?
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, email])
+  @@index([tenantId, orgId])
+  @@index([tenantId, score])
+  @@map("candidates")
+}
+
+// ============================================
+// AUDIT LOGS
+// ============================================
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  action        String
+  resourceType  String   @map("resource_type")
+  resourceId    String   @map("resource_id")
+  actorId       String   @map("actor_id")
+  tenantId      String   @map("tenant_id")
+  orgId         String   @map("org_id")
+  correlationId String?  @map("correlation_id")
+  metadata      Json?
+  timestamp     DateTime @default(now())
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, resourceType, resourceId])
+  @@index([tenantId, actorId])
+  @@index([tenantId, timestamp])
+  @@index([correlationId])
+  @@map("audit_logs")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id          String   @id @default(uuid())
+  recipientId String   @map("recipient_id")
+  channel     String   @default("PUSH")
+  templateId  String?  @map("template_id")
+  subject     String?
+  message     String
+  status      String   @default("PENDING")
+  tenantId    String   @map("tenant_id")
+  orgId       String   @map("org_id")
+  metadata    Json?
+  sentAt      DateTime? @map("sent_at")
+  failedAt    DateTime? @map("failed_at")
+  errorMessage String?  @map("error_message")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, recipientId])
+  @@index([tenantId, status])
+  @@map("notifications")
+}
+
+// ============================================
+// NOTIFICATION TEMPLATES
+// ============================================
+
+model NotificationTemplate {
+  id        String   @id @default(uuid())
+  name      String
+  channel   String
+  subject   String?
+  body      String
+  variables String[]
+  tenantId  String   @map("tenant_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, name])
+  @@map("notification_templates")
+}
