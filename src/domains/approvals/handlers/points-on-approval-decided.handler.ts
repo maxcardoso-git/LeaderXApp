@@ -7,7 +7,7 @@ import {
   ApprovalDecidedEvent,
   APPROVAL_DECIDED_EVENT,
 } from '../events/approval-decided.event';
-import { PointsService } from '../../../../services/admin-bff/api/points.service';
+import { PointsApiClient } from '../../../infrastructure/openapi-clients';
 
 @Injectable()
 export class PointsOnApprovalDecidedHandler
@@ -17,7 +17,7 @@ export class PointsOnApprovalDecidedHandler
   private readonly logger = new Logger(PointsOnApprovalDecidedHandler.name);
 
   constructor(
-    private readonly pointsApi: PointsService,
+    private readonly pointsApi: PointsApiClient,
     private readonly retryService: RetryService,
   ) {}
 
@@ -37,25 +37,21 @@ export class PointsOnApprovalDecidedHandler
     await this.retryService.execute(
       async () => {
         const response = await firstValueFrom(
-          this.pointsApi.pointsRecalculate({
+          this.pointsApi.recalculatePoints({
             xTenantId: event.tenantId,
             xOrgId: event.orgId,
             xCycleId: event.cycleId,
             xRequestId: event.correlationId,
-            pointsRecalculateRequest: {
-              reason: 'APPROVAL_DECIDED',
-              metadata: {
-                approvalId: event.aggregateId,
-                approvalType: event.approvalType,
-                decidedBy: event.decidedBy,
-              },
+            body: {
+              candidateId: event.aggregateId,
+              reason: `APPROVAL_DECIDED:${event.approvalType}`,
             },
           }),
         );
 
         this.logger.log(
           `Points recalculation triggered for approval ${event.aggregateId}`,
-          { jobId: response.data },
+          { success: response.data.success },
         );
       },
       {

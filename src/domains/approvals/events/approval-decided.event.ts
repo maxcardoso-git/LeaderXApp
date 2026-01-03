@@ -4,7 +4,7 @@ export const APPROVAL_DECIDED_EVENT = 'approval.decided';
 
 export type ApprovalDecision = 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
 
-export interface ApprovalDecidedPayload {
+export interface ApprovalDecidedPayload extends Record<string, unknown> {
   approvalId: string;
   decision: ApprovalDecision;
   approvalType: string;

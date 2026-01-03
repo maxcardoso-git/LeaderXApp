@@ -7,7 +7,7 @@ import {
   ApprovalDecidedEvent,
   APPROVAL_DECIDED_EVENT,
 } from '../events/approval-decided.event';
-import { CommunicationsService } from '../../../../services/admin-bff/api/communications.service';
+import { CommunicationsApiClient } from '../../../infrastructure/openapi-clients';
 
 @Injectable()
 export class NotifyOnApprovalDecidedHandler
@@ -17,7 +17,7 @@ export class NotifyOnApprovalDecidedHandler
   private readonly logger = new Logger(NotifyOnApprovalDecidedHandler.name);
 
   constructor(
-    private readonly commsApi: CommunicationsService,
+    private readonly commsApi: CommunicationsApiClient,
     private readonly retryService: RetryService,
   ) {}
 
@@ -26,26 +26,18 @@ export class NotifyOnApprovalDecidedHandler
       `Sending notification for approval decision: ${event.aggregateId}`,
     );
 
-    const notificationType =
-      event.decision === 'APPROVED'
-        ? 'APPROVAL_APPROVED'
-        : event.decision === 'REJECTED'
-          ? 'APPROVAL_REJECTED'
-          : 'APPROVAL_CHANGES_REQUESTED';
-
     await this.retryService.execute(
       async () => {
         const response = await firstValueFrom(
-          this.commsApi.createNotification({
+          this.commsApi.sendNotification({
             xTenantId: event.tenantId,
             xOrgId: event.orgId,
             xRequestId: event.correlationId,
-            createNotificationRequest: {
-              type: notificationType,
-              title: this.getNotificationTitle(event),
+            body: {
+              recipientId: event.decidedBy,
+              subject: this.getNotificationTitle(event),
               message: this.getNotificationMessage(event),
-              priority: 'NORMAL',
-              channels: ['IN_APP', 'EMAIL'],
+              channel: 'EMAIL',
               metadata: {
                 approvalId: event.aggregateId,
                 approvalType: event.approvalType,
@@ -59,7 +51,7 @@ export class NotifyOnApprovalDecidedHandler
 
         this.logger.log(
           `Notification sent for approval ${event.aggregateId}`,
-          { notificationId: response.data },
+          { notificationId: response.data.notificationId },
         );
       },
       {

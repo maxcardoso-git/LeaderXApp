@@ -1,6 +1,5 @@
 import { Module, OnModuleInit } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
-import { ConfigService } from '@nestjs/config';
 
 // Controllers
 import { ApprovalsController } from './controllers/approvals.controller';
@@ -19,24 +18,22 @@ import { AuditOnApprovalDecidedHandler } from './handlers/audit-on-approval-deci
 // Event Bus
 import { InMemoryEventBus } from '../../common/eventing/in-memory-event-bus';
 
-// OpenAPI Clients
-import { ApprovalsService as ApprovalsApiClient } from '../../../services/admin-bff/api/approvals.service';
-import { PointsService as PointsApiClient } from '../../../services/admin-bff/api/points.service';
-import { CommunicationsService as CommsApiClient } from '../../../services/admin-bff/api/communications.service';
-import { AuditService as AuditApiClient } from '../../../services/admin-bff/api/audit.service';
-import { Configuration } from '../../../services/admin-bff/configuration';
+// API Clients
+import {
+  ApprovalsApiClient,
+  PointsApiClient,
+  CommunicationsApiClient,
+  AuditApiClient,
+} from '../../infrastructure/openapi-clients';
 
 @Module({
   imports: [
-    HttpModule.registerAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        timeout: 30000,
-        maxRedirects: 5,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }),
+    HttpModule.register({
+      timeout: 30000,
+      maxRedirects: 5,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     }),
   ],
   controllers: [ApprovalsController],
@@ -52,26 +49,10 @@ import { Configuration } from '../../../services/admin-bff/configuration';
     NotifyOnApprovalDecidedHandler,
     AuditOnApprovalDecidedHandler,
 
-    // OpenAPI Client Configuration
-    {
-      provide: Configuration,
-      useFactory: (config: ConfigService) => {
-        return new Configuration({
-          basePath: config.get<string>(
-            'CORE_API_BASE_URL',
-            'https://api.example.com/admin-bff/v1',
-          ),
-          accessToken: () =>
-            Promise.resolve(config.get<string>('CORE_API_TOKEN', '')),
-        });
-      },
-      inject: [ConfigService],
-    },
-
-    // OpenAPI Clients
+    // API Clients
     ApprovalsApiClient,
     PointsApiClient,
-    CommsApiClient,
+    CommunicationsApiClient,
     AuditApiClient,
   ],
   exports: [ApprovalsFacade],

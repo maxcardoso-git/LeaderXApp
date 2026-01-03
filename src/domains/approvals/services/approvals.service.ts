@@ -1,20 +1,31 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { firstValueFrom } from 'rxjs';
-import { ApprovalsService as ApprovalsApiClient } from '../../../../services/admin-bff/api/approvals.service';
 import { RequestContextService } from '../../../common/request-context/request-context.service';
 import {
   ApprovalNotFoundException,
   UpstreamServiceException,
 } from '../../../common/errors/domain-exceptions';
+import {
+  ApprovalsApiClient,
+  ApprovalDecisionRequest,
+  ApprovalDecisionResponse,
+  ApprovalDetailResponse,
+  PagedApprovalsResponse,
+  BulkApprovalDecisionRequest,
+  BulkApprovalDecisionResponse,
+  ApprovalState,
+} from '../../../infrastructure/openapi-clients';
 
-// Re-export types from OpenAPI client for convenience
-export { ApprovalDecisionRequest } from '../../../../services/admin-bff/model/approvalDecisionRequest';
-export { ApprovalDecisionResponse } from '../../../../services/admin-bff/model/approvalDecisionResponse';
-export { ApprovalDetailResponse } from '../../../../services/admin-bff/model/approvalDetailResponse';
-export { PagedApprovalsResponse } from '../../../../services/admin-bff/model/pagedApprovalsResponse';
-export { BulkApprovalDecisionRequest } from '../../../../services/admin-bff/model/bulkApprovalDecisionRequest';
-export { BulkApprovalDecisionResponse } from '../../../../services/admin-bff/model/bulkApprovalDecisionResponse';
-export { ApprovalState } from '../../../../services/admin-bff/model/approvalState';
+// Re-export types for convenience
+export {
+  ApprovalDecisionRequest,
+  ApprovalDecisionResponse,
+  ApprovalDetailResponse,
+  PagedApprovalsResponse,
+  BulkApprovalDecisionRequest,
+  BulkApprovalDecisionResponse,
+  ApprovalState,
+};
 
 export interface ListApprovalsParams {
   state?: string;

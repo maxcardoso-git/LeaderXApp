@@ -3,7 +3,14 @@
     "allow": [
       "Bash(scp:*)",
       "Bash(ssh root@72.61.52.70 \"cat ~/LeaderXApp/.env 2>/dev/null || cat ~/LeaderXApp/.env.local 2>/dev/null || echo ''Nenhum .env encontrado''\")",
-      "Bash(ssh root@72.61.52.70 \"find ~ -name ''.env*'' -o -name ''*.env'' 2>/dev/null | head -20\")"
+      "Bash(ssh root@72.61.52.70 \"find ~ -name ''.env*'' -o -name ''*.env'' 2>/dev/null | head -20\")",
+      "Bash(npm install:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: CI/CD workflow errors\n\n- Remove package-lock.json from .gitignore \\(npm ci requires it\\)\n- Fix invalid secrets condition in CI workflow\n- Add generated package-lock.json\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run build:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

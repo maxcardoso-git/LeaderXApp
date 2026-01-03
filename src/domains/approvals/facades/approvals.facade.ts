@@ -7,7 +7,6 @@ import { RequestContextService } from '../../../common/request-context/request-c
 import { MissingIdempotencyKeyException } from '../../../common/errors/domain-exceptions';
 import {
   ApprovalDecidedEvent,
-  APPROVAL_DECIDED_EVENT,
   ApprovalDecision,
 } from '../events/approval-decided.event';
 

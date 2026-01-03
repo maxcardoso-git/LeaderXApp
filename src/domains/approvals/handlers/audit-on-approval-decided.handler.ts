@@ -7,7 +7,7 @@ import {
   ApprovalDecidedEvent,
   APPROVAL_DECIDED_EVENT,
 } from '../events/approval-decided.event';
-import { AuditService } from '../../../../services/admin-bff/api/audit.service';
+import { AuditApiClient } from '../../../infrastructure/openapi-clients';
 
 @Injectable()
 export class AuditOnApprovalDecidedHandler
@@ -17,7 +17,7 @@ export class AuditOnApprovalDecidedHandler
   private readonly logger = new Logger(AuditOnApprovalDecidedHandler.name);
 
   constructor(
-    private readonly auditApi: AuditService,
+    private readonly auditApi: AuditApiClient,
     private readonly retryService: RetryService,
   ) {}
 
@@ -29,26 +29,22 @@ export class AuditOnApprovalDecidedHandler
     await this.retryService.execute(
       async () => {
         const response = await firstValueFrom(
-          this.auditApi.appendAuditLog({
+          this.auditApi.createAuditLog({
             xTenantId: event.tenantId,
             xOrgId: event.orgId,
             xRequestId: event.correlationId,
-            auditLogItem: {
+            body: {
               action: 'APPROVAL_DECIDED',
-              entityType: 'APPROVAL',
-              entityId: event.aggregateId,
+              resourceType: 'APPROVAL',
+              resourceId: event.aggregateId,
               actorId: event.decidedBy,
               timestamp: event.occurredAt.toISOString(),
-              changes: {
-                decision: event.decision,
-                reason: event.reason,
-              },
+              correlationId: event.correlationId,
               metadata: {
                 approvalType: event.approvalType,
-                candidateId: event.candidateId,
-                candidateName: event.candidateName,
+                decision: event.decision,
+                reason: event.reason,
                 cycleId: event.cycleId,
-                correlationId: event.correlationId,
               },
             },
           }),
@@ -56,7 +52,7 @@ export class AuditOnApprovalDecidedHandler
 
         this.logger.log(
           `Audit log created for approval ${event.aggregateId}`,
-          { auditId: response.data },
+          { auditId: response.data.auditLogId },
         );
       },
       {

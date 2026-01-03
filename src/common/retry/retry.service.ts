@@ -143,7 +143,7 @@ export class RetryService {
    * Extract HTTP status code from various error shapes
    */
   private extractHttpStatus(error: Error): number | null {
-    const e = error as Record<string, unknown>;
+    const e = error as unknown as Record<string, unknown>;
 
     // Try common error shapes
     if (typeof e.status === 'number') return e.status;
