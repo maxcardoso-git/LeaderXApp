@@ -15,6 +15,12 @@ import { PointsOnApprovalDecidedHandler } from './handlers/points-on-approval-de
 import { NotifyOnApprovalDecidedHandler } from './handlers/notify-on-approval-decided.handler';
 import { AuditOnApprovalDecidedHandler } from './handlers/audit-on-approval-decided.handler';
 
+// Common Modules
+import { IdempotencyModule } from '../../common/idempotency/idempotency.module';
+import { EventingModule } from '../../common/eventing/eventing.module';
+import { OutboxModule } from '../../common/outbox/outbox.module';
+import { RequestContextModule } from '../../common/request-context/request-context.module';
+
 // Event Bus
 import { InMemoryEventBus } from '../../common/eventing/in-memory-event-bus';
 
@@ -35,6 +41,10 @@ import {
         'Content-Type': 'application/json',
       },
     }),
+    IdempotencyModule,
+    EventingModule,
+    OutboxModule,
+    RequestContextModule,
   ],
   controllers: [ApprovalsController],
   providers: [
