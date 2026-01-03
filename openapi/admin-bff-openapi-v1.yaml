@@ -1,0 +1,3982 @@
+openapi: 3.0.3
+info:
+  title: Admin BFF API
+  version: 1.0.0
+  description: |
+    Admin BFF (screen-first) API for Admin Platform.
+    - Aggregates Core Domain Services for UI use-cases
+    - Applies RBAC/ABAC and context enforcement (tenant/org/cycle)
+servers:
+  - url: https://api.example.com/admin-bff/v1
+    description: Production
+  - url: https://staging-api.example.com/admin-bff/v1
+    description: Staging
+security:
+  - bearerAuth: []
+tags:
+  - name: Session
+  - name: Navigation
+  - name: Members
+  - name: Approvals
+  - name: Structure
+  - name: Cycles
+  - name: Points
+  - name: Events
+  - name: Billing
+  - name: Communications
+  - name: Feedback
+  - name: Audit
+  - name: Suppliers
+
+x-request-context:
+  description: Required request context headers for multi-tenant execution.
+  requiredHeaders:
+    X-Tenant-Id:
+      description: Tenant identifier (UUID or slug)
+    X-Org-Id:
+      description: Organization identifier (UUID or slug)
+    X-Cycle-Id:
+      description: Cycle identifier (optional; required for cycle-scoped screens)
+    X-Request-Id:
+      description: Client-generated correlation id (optional but recommended)
+    Accept-Language:
+      description: pt-BR | en | es (default en)
+
+paths:
+  /me:
+    get:
+      tags: [Session]
+      summary: Get current admin identity, scopes, roles and capabilities baseline
+      operationId: getMe
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      responses:
+        "200":
+          description: Current identity and context
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /nav:
+    get:
+      tags: [Navigation]
+      summary: Get navigation model based on permissions, feature flags and context
+      operationId: getNav
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      responses:
+        "200":
+          description: Menu structure for Admin UI
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NavResponse"
+        "304":
+          description: Not modified
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /capabilities:
+    get:
+      tags: [Navigation]
+      summary: Get capabilities for a given screen (actions allowed)
+      operationId: getCapabilities
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: screen
+          in: query
+          required: true
+          schema:
+            type: string
+          example: members.list
+      responses:
+        "200":
+          description: Capabilities for the screen
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CapabilitiesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /dashboard/overview:
+    get:
+      tags: [Navigation]
+      summary: Admin dashboard overview KPIs and operational counters
+      operationId: getAdminDashboardOverview
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      responses:
+        "200":
+          description: Overview data
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardOverviewResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /members:
+    get:
+      tags: [Members]
+      summary: List members (grid) with filters and projections
+      operationId: listMembers
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - $ref: "#/components/parameters/QueryQ"
+        - $ref: "#/components/parameters/QueryStatus"
+        - $ref: "#/components/parameters/QueryCategoryId"
+        - $ref: "#/components/parameters/QuerySegmentId"
+        - $ref: "#/components/parameters/QueryCommunityId"
+        - $ref: "#/components/parameters/QueryNucleusId"
+        - $ref: "#/components/parameters/QueryFrom"
+        - $ref: "#/components/parameters/QueryTo"
+        - $ref: "#/components/parameters/QueryView"
+        - $ref: "#/components/parameters/QueryInclude"
+        - $ref: "#/components/parameters/QueryExpand"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+        - $ref: "#/components/parameters/QuerySort"
+      responses:
+        "200":
+          description: Members grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedMembersResponse"
+        "304":
+          description: Not modified
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /members/{memberId}:
+    get:
+      tags: [Members]
+      summary: Get member detail with optional expansions (screen-ready)
+      operationId: getMember
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - $ref: "#/components/parameters/PathMemberId"
+        - $ref: "#/components/parameters/QueryView"
+        - $ref: "#/components/parameters/QueryInclude"
+        - $ref: "#/components/parameters/QueryExpand"
+      responses:
+        "200":
+          description: Member detail
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /members/{memberId}/status:
+    post:
+      tags: [Members]
+      summary: Change member status (admin action)
+      operationId: changeMemberStatus
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - $ref: "#/components/parameters/PathMemberId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeMemberStatusRequest"
+      responses:
+        "200":
+          description: Status updated
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberStatusChangeResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /members/{memberId}/assign:
+    post:
+      tags: [Members]
+      summary: Assign member to structure/community/nucleus/position
+      operationId: assignMember
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - $ref: "#/components/parameters/PathMemberId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberAssignRequest"
+      responses:
+        "200":
+          description: Assignment applied
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberAssignResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /members/{memberId}/history:
+    get:
+      tags: [Members]
+      summary: Get member administrative history (approvals, status changes, key actions)
+      operationId: getMemberHistory
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - $ref: "#/components/parameters/PathMemberId"
+        - $ref: "#/components/parameters/QueryFrom"
+        - $ref: "#/components/parameters/QueryTo"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Member history events
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedMemberHistoryResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /approvals:
+    get:
+      tags: [Approvals]
+      summary: List approval requests (queue)
+      operationId: listApprovals
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ApprovalState"
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+          example: MEMBER_ONBOARDING
+        - name: priority
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, URGENT]
+        - $ref: "#/components/parameters/QueryQ"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+        - $ref: "#/components/parameters/QuerySort"
+      responses:
+        "200":
+          description: Approval queue
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedApprovalsResponse"
+        "304":
+          description: Not modified
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /approvals/{approvalId}:
+    get:
+      tags: [Approvals]
+      summary: Get approval request detail
+      operationId: getApproval
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: apr_01J9Z0JZ2K1P0
+      responses:
+        "200":
+          description: Approval detail
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /approvals/{approvalId}/decide:
+    post:
+      tags: [Approvals]
+      summary: Decide an approval request (approve/reject/request changes)
+      operationId: decideApproval
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: approvalId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: apr_01J9Z0JZ2K1P0
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalDecisionRequest"
+      responses:
+        "200":
+          description: Decision applied
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalDecisionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /approvals/bulk-decide:
+    post:
+      tags: [Approvals]
+      summary: Bulk decide approvals (with per-item results)
+      operationId: bulkDecideApprovals
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkApprovalDecisionRequest"
+      responses:
+        "200":
+          description: Bulk decision results
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulkApprovalDecisionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /structures:
+    get:
+      tags: [Structure]
+      summary: List structures
+      operationId: listStructures
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+          example: COMMUNITY
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+        - $ref: "#/components/parameters/QuerySort"
+      responses:
+        "200":
+          description: Structures list
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedStructuresResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+    post:
+      tags: [Structure]
+      summary: Create structure
+      operationId: createStructure
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStructureRequest"
+      responses:
+        "201":
+          description: Structure created
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StructureResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /structures/{structureId}:
+    get:
+      tags: [Structure]
+      summary: Get structure detail
+      operationId: getStructure
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: structureId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: str_01J9Z0K3V9A
+        - $ref: "#/components/parameters/QueryExpand"
+      responses:
+        "200":
+          description: Structure detail
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StructureDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+    put:
+      tags: [Structure]
+      summary: Update structure
+      operationId: updateStructure
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: structureId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: str_01J9Z0K3V9A
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStructureRequest"
+      responses:
+        "200":
+          description: Structure updated
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StructureResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /communities:
+    get:
+      tags: [Structure]
+      summary: List communities
+      operationId: listCommunities
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - $ref: "#/components/parameters/QueryQ"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+        - $ref: "#/components/parameters/QuerySort"
+      responses:
+        "200":
+          description: Communities grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedCommunitiesResponse"
+
+  /communities/{communityId}:
+    get:
+      tags: [Structure]
+      summary: Get community detail
+      operationId: getCommunity
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: communityId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: com_01J9Z0M0D2
+        - $ref: "#/components/parameters/QueryExpand"
+      responses:
+        "200":
+          description: Community detail
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommunityDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /nuclei:
+    get:
+      tags: [Structure]
+      summary: List nuclei by community (and optional filters)
+      operationId: listNuclei
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: communityId
+          in: query
+          required: false
+          schema:
+            type: string
+          example: com_01J9Z0M0D2
+        - $ref: "#/components/parameters/QueryQ"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Nuclei grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedNucleiResponse"
+
+  /cycles:
+    get:
+      tags: [Cycles]
+      summary: List cycles
+      operationId: listCycles
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/CycleStatus"
+      responses:
+        "200":
+          description: Cycles list
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CyclesResponse"
+
+    post:
+      tags: [Cycles]
+      summary: Create cycle
+      operationId: createCycle
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCycleRequest"
+      responses:
+        "201":
+          description: Cycle created
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CycleResponse"
+
+  /cycles/{cycleId}:
+    get:
+      tags: [Cycles]
+      summary: Get cycle detail (with phases and enabled blocks)
+      operationId: getCycle
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: cycleId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: cyc_01J9Z0QH3A
+        - $ref: "#/components/parameters/QueryExpand"
+      responses:
+        "200":
+          description: Cycle detail
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CycleDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /cycles/{cycleId}/publish:
+    post:
+      tags: [Cycles]
+      summary: Publish cycle (make it active/usable)
+      operationId: publishCycle
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: cycleId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: cyc_01J9Z0QH3A
+      responses:
+        "200":
+          description: Cycle published
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CycleResponse"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /cycles/{cycleId}/enable-blocks:
+    post:
+      tags: [Cycles]
+      summary: Update enabled blocks matrix for the cycle/phases
+      operationId: setCycleEnabledBlocks
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: cycleId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: cyc_01J9Z0QH3A
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnableBlocksRequest"
+      responses:
+        "200":
+          description: Enabled blocks updated
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnableBlocksResponse"
+
+  /points/rules:
+    get:
+      tags: [Points]
+      summary: List point rules (admin)
+      operationId: listPointRules
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - $ref: "#/components/parameters/QueryQ"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Rules grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedPointRulesResponse"
+    post:
+      tags: [Points]
+      summary: Create point rule
+      operationId: createPointRule
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePointRuleRequest"
+      responses:
+        "201":
+          description: Rule created
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointRuleResponse"
+
+  /points/rules/{ruleId}:
+    put:
+      tags: [Points]
+      summary: Update point rule
+      operationId: updatePointRule
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: pr_01J9Z10R2V
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePointRuleRequest"
+      responses:
+        "200":
+          description: Rule updated
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointRuleResponse"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /points/plans:
+    get:
+      tags: [Points]
+      summary: List point plans
+      operationId: listPointPlans
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      responses:
+        "200":
+          description: Plans list
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointPlansResponse"
+
+  /points/plans/{planId}:
+    put:
+      tags: [Points]
+      summary: Update point plan
+      operationId: updatePointPlan
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: planId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: pp_01J9Z12G9K
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePointPlanRequest"
+      responses:
+        "200":
+          description: Plan updated
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointPlanResponse"
+
+  /points/ledger:
+    get:
+      tags: [Points]
+      summary: Query points ledger entries (immutable)
+      operationId: getPointsLedger
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: memberId
+          in: query
+          required: true
+          schema:
+            type: string
+          example: mem_01J9Z0B2QJ
+        - $ref: "#/components/parameters/QueryFrom"
+        - $ref: "#/components/parameters/QueryTo"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Ledger entries
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedPointLedgerResponse"
+
+  /points/recalculate:
+    post:
+      tags: [Points]
+      summary: Request points recalculation (async safe operation)
+      operationId: requestPointsRecalculation
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PointsRecalculateRequest"
+      responses:
+        "202":
+          description: Recalculation queued
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncJobAcceptedResponse"
+
+  /events:
+    get:
+      tags: [Events]
+      summary: List events
+      operationId: listEvents
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/EventStatus"
+        - $ref: "#/components/parameters/QueryFrom"
+        - $ref: "#/components/parameters/QueryTo"
+        - $ref: "#/components/parameters/QueryQ"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+        - $ref: "#/components/parameters/QuerySort"
+      responses:
+        "200":
+          description: Events grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedEventsResponse"
+
+    post:
+      tags: [Events]
+      summary: Create event
+      operationId: createEvent
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEventRequest"
+      responses:
+        "201":
+          description: Event created
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResponse"
+
+  /events/{eventId}:
+    get:
+      tags: [Events]
+      summary: Get event detail
+      operationId: getEvent
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: evt_01J9Z1B5GW
+        - $ref: "#/components/parameters/QueryExpand"
+      responses:
+        "200":
+          description: Event detail
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventDetailResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /events/{eventId}/publish:
+    post:
+      tags: [Events]
+      summary: Publish event
+      operationId: publishEvent
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: evt_01J9Z1B5GW
+      responses:
+        "200":
+          description: Event published
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventResponse"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /events/{eventId}/registrations:
+    get:
+      tags: [Events]
+      summary: List event registrations
+      operationId: listEventRegistrations
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: evt_01J9Z1B5GW
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [PENDING, CONFIRMED, CANCELED, WAITLIST]
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Registrations grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedRegistrationsResponse"
+
+  /events/{eventId}/permissions:
+    post:
+      tags: [Events]
+      summary: Update event permissions/policies
+      operationId: updateEventPermissions
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: evt_01J9Z1B5GW
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventPermissionsRequest"
+      responses:
+        "200":
+          description: Event permissions updated
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventPermissionsResponse"
+
+  /billing/invoices:
+    get:
+      tags: [Billing]
+      summary: List invoices
+      operationId: listInvoices
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [DRAFT, ISSUED, PAID, OVERDUE, CANCELED]
+        - name: memberId
+          in: query
+          required: false
+          schema:
+            type: string
+        - $ref: "#/components/parameters/QueryFrom"
+        - $ref: "#/components/parameters/QueryTo"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Invoices grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedInvoicesResponse"
+
+  /billing/payments:
+    get:
+      tags: [Billing]
+      summary: List payments
+      operationId: listPayments
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [AUTHORIZED, CAPTURED, FAILED, REFUNDED]
+        - name: provider
+          in: query
+          required: false
+          schema:
+            type: string
+          example: STRIPE
+        - $ref: "#/components/parameters/QueryFrom"
+        - $ref: "#/components/parameters/QueryTo"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Payments grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedPaymentsResponse"
+
+  /billing/reconcile:
+    post:
+      tags: [Billing]
+      summary: Request billing reconciliation (async)
+      operationId: reconcileBilling
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillingReconcileRequest"
+      responses:
+        "202":
+          description: Reconciliation queued
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncJobAcceptedResponse"
+
+  /billing/refund:
+    post:
+      tags: [Billing]
+      summary: Request a refund
+      operationId: refundPayment
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefundRequest"
+      responses:
+        "202":
+          description: Refund requested
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AsyncJobAcceptedResponse"
+
+  /comms/notifications:
+    get:
+      tags: [Communications]
+      summary: List notifications campaigns
+      operationId: listNotifications
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [DRAFT, SCHEDULED, SENDING, SENT, FAILED]
+        - $ref: "#/components/parameters/QueryQ"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Notifications grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedNotificationsResponse"
+
+    post:
+      tags: [Communications]
+      summary: Create notification campaign
+      operationId: createNotification
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNotificationRequest"
+      responses:
+        "201":
+          description: Notification created
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationResponse"
+
+  /comms/newsletters:
+    get:
+      tags: [Communications]
+      summary: List newsletters
+      operationId: listNewsletters
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [DRAFT, SCHEDULED, SENDING, SENT, FAILED]
+        - $ref: "#/components/parameters/QueryQ"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Newsletters grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedNewslettersResponse"
+
+    post:
+      tags: [Communications]
+      summary: Create newsletter
+      operationId: createNewsletter
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNewsletterRequest"
+      responses:
+        "201":
+          description: Newsletter created
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewsletterResponse"
+
+  /comms/email-templates:
+    get:
+      tags: [Communications]
+      summary: List email templates
+      operationId: listEmailTemplates
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      responses:
+        "200":
+          description: Templates list
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailTemplatesResponse"
+
+  /comms/email-templates/{templateId}:
+    put:
+      tags: [Communications]
+      summary: Update email template
+      operationId: updateEmailTemplate
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: templateId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: tpl_01J9Z1X0QY
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateEmailTemplateRequest"
+      responses:
+        "200":
+          description: Template updated
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailTemplateResponse"
+
+  /comms/preview:
+    post:
+      tags: [Communications]
+      summary: Render a preview for a template with variables (safe preview)
+      operationId: previewCommunication
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PreviewRequest"
+      responses:
+        "200":
+          description: Preview result
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreviewResponse"
+
+  /feedback/nps/campaigns:
+    get:
+      tags: [Feedback]
+      summary: List NPS campaigns
+      operationId: listNpsCampaigns
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: NPS campaigns grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedNpsCampaignsResponse"
+    post:
+      tags: [Feedback]
+      summary: Create NPS campaign
+      operationId: createNpsCampaign
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNpsCampaignRequest"
+      responses:
+        "201":
+          description: Campaign created
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NpsCampaignResponse"
+
+  /feedback/nps/{campaignId}/results:
+    get:
+      tags: [Feedback]
+      summary: Get NPS campaign results (aggregates)
+      operationId: getNpsResults
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: campaignId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: nps_01J9Z2A1QF
+      responses:
+        "200":
+          description: NPS results
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NpsResultsResponse"
+
+  /audit/logs:
+    get:
+      tags: [Audit]
+      summary: Search admin logs (UI and/or core logs unified view)
+      operationId: searchAuditLogs
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - $ref: "#/components/parameters/QueryFrom"
+        - $ref: "#/components/parameters/QueryTo"
+        - name: actorId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+          example: approvals.decide
+        - $ref: "#/components/parameters/QueryQ"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Logs grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedAuditLogsResponse"
+
+  /audit/trails:
+    get:
+      tags: [Audit]
+      summary: Get audit trail for an entity
+      operationId: getAuditTrail
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: entityType
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Member
+        - name: entityId
+          in: query
+          required: true
+          schema:
+            type: string
+          example: mem_01J9Z0B2QJ
+        - $ref: "#/components/parameters/QueryFrom"
+        - $ref: "#/components/parameters/QueryTo"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Audit trail entries
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedAuditTrailResponse"
+
+  /controls/alerts:
+    get:
+      tags: [Audit]
+      summary: Get operational/security alerts (anomaly, policy violations)
+      operationId: listControlAlerts
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: severity
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [INFO, LOW, MEDIUM, HIGH, CRITICAL]
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [OPEN, ACKED, RESOLVED]
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Alerts grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedControlAlertsResponse"
+
+  /suppliers:
+    get:
+      tags: [Suppliers]
+      summary: List suppliers
+      operationId: listSuppliers
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - $ref: "#/components/parameters/QueryQ"
+        - $ref: "#/components/parameters/QueryPage"
+        - $ref: "#/components/parameters/QuerySize"
+      responses:
+        "200":
+          description: Suppliers grid
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedSuppliersResponse"
+    post:
+      tags: [Suppliers]
+      summary: Create supplier
+      operationId: createSupplier
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSupplierRequest"
+      responses:
+        "201":
+          description: Supplier created
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplierResponse"
+
+  /suppliers/{supplierId}:
+    put:
+      tags: [Suppliers]
+      summary: Update supplier
+      operationId: updateSupplier
+      parameters:
+        - $ref: "#/components/parameters/HeaderTenantId"
+        - $ref: "#/components/parameters/HeaderOrgId"
+        - $ref: "#/components/parameters/HeaderCycleId"
+        - $ref: "#/components/parameters/HeaderRequestId"
+        - $ref: "#/components/parameters/HeaderAcceptLanguage"
+        - name: supplierId
+          in: path
+          required: true
+          schema:
+            type: string
+          example: sup_01J9Z2N8R4
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSupplierRequest"
+      responses:
+        "200":
+          description: Supplier updated
+          headers:
+            X-Request-Id:
+              $ref: "#/components/headers/XRequestId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SupplierResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  headers:
+    XRequestId:
+      schema:
+        type: string
+      description: Correlation id for the request
+    ETag:
+      schema:
+        type: string
+      description: Entity tag for cache validation (If-None-Match)
+
+  parameters:
+    HeaderTenantId:
+      name: X-Tenant-Id
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Tenant identifier
+    HeaderOrgId:
+      name: X-Org-Id
+      in: header
+      required: true
+      schema:
+        type: string
+      description: Organization identifier
+    HeaderCycleId:
+      name: X-Cycle-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Cycle identifier (required for cycle-scoped operations)
+    HeaderRequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Client correlation id
+    HeaderAcceptLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      schema:
+        type: string
+        default: en
+        enum: [pt-BR, en, es]
+      description: Response language
+    PathMemberId:
+      name: memberId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: mem_01J9Z0B2QJ
+    QueryQ:
+      name: q
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Free text search
+    QueryStatus:
+      name: status
+      in: query
+      required: false
+      schema:
+        $ref: "#/components/schemas/MemberStatus"
+    QueryCategoryId:
+      name: categoryId
+      in: query
+      required: false
+      schema:
+        type: string
+    QuerySegmentId:
+      name: segmentId
+      in: query
+      required: false
+      schema:
+        type: string
+    QueryCommunityId:
+      name: communityId
+      in: query
+      required: false
+      schema:
+        type: string
+    QueryNucleusId:
+      name: nucleusId
+      in: query
+      required: false
+      schema:
+        type: string
+    QueryFrom:
+      name: from
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+      description: Start timestamp (inclusive)
+    QueryTo:
+      name: to
+      in: query
+      required: false
+      schema:
+        type: string
+        format: date-time
+      description: End timestamp (exclusive)
+    QueryView:
+      name: view
+      in: query
+      required: false
+      schema:
+        type: string
+        enum: [compact, default, full]
+      description: Projection/view model hint
+    QueryInclude:
+      name: include
+      in: query
+      required: false
+      schema:
+        type: array
+        items:
+          type: string
+      style: form
+      explode: false
+      description: Include optional sections, comma-separated (e.g. include=pointsSummary,approvalsHistory)
+    QueryExpand:
+      name: expand
+      in: query
+      required: false
+      schema:
+        type: array
+        items:
+          type: string
+      style: form
+      explode: false
+      description: Expand nested resources, comma-separated
+    QueryPage:
+      name: page
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    QuerySize:
+      name: size
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 25
+    QuerySort:
+      name: sort
+      in: query
+      required: false
+      schema:
+        type: string
+      description: Sort expression (e.g. createdAt:desc,name:asc)
+
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Unauthorized (missing/invalid token)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Forbidden (insufficient permissions)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflict (state/version/business constraints)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+
+    SupplierResponse:
+      type: object
+      required:
+        - supplierId
+        - name
+        - status
+        - createdAt
+      properties:
+        supplierId:
+          type: string
+          example: sup_123456
+        name:
+          type: string
+          example: ACME Supplies
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - requestId
+        -  timestamp
+      properties:
+        error:
+          type: string
+          example: BAD_REQUEST
+        message:
+          type: string
+          example: "Invalid filter: status"
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+        requestId:
+          type: string
+          example: 8ad1f3b1-0f0f-4c3a-a0e2-5d1d9a0f8a1c
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorDetail:
+      type: object
+      properties:
+        field:
+          type: string
+          example: status
+        code:
+          type: string
+          example: INVALID_ENUM
+        message:
+          type: string
+          example: Must be one of ACTIVE, SUSPENDED, PENDING
+
+    PagedMeta:
+      type: object
+      required: [page, size, totalItems, totalPages]
+      properties:
+        page:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 25
+        totalItems:
+          type: integer
+          example: 257
+        totalPages:
+          type: integer
+          example: 11
+
+    Capability:
+      type: object
+      required: [code, allowed]
+      properties:
+        code:
+          type: string
+          example: approvals.decide
+        allowed:
+          type: boolean
+          example: true
+        reason:
+          type: string
+          nullable: true
+          example: null
+
+    CapabilitiesResponse:
+      type: object
+      required: [screen, capabilities]
+      properties:
+        screen:
+          type: string
+          example: members.list
+        capabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/Capability"
+
+    MeResponse:
+      type: object
+      required: [actor, context, roles, scopes]
+      properties:
+        actor:
+          $ref: "#/components/schemas/Actor"
+        context:
+          $ref: "#/components/schemas/RequestContext"
+        roles:
+          type: array
+          items:
+            type: string
+          example: ["ADMIN", "APPROVER"]
+        scopes:
+          type: array
+          items:
+            $ref: "#/components/schemas/Scope"
+        features:
+          type: object
+          additionalProperties:
+            type: boolean
+          example:
+            pointsEngine: true
+            billing: false
+
+    Actor:
+      type: object
+      required: [adminId, email, name]
+      properties:
+        adminId:
+          type: string
+          example: adm_01J9Z0A3X1
+        email:
+          type: string
+          format: email
+          example: admin@empresa.com
+        name:
+          type: string
+          example: Ana Silva
+
+    Scope:
+      type: object
+      required: [type, id]
+      properties:
+        type:
+          type: string
+          enum: [TENANT, ORG, COMMUNITY, NUCLEUS]
+        id:
+          type: string
+          example: org_01J9Z0A2BC
+
+    RequestContext:
+      type: object
+      required: [tenantId, orgId]
+      properties:
+        tenantId:
+          type: string
+          example: tnt_01J9Z0A1AA
+        orgId:
+          type: string
+          example: org_01J9Z0A2BC
+        cycleId:
+          type: string
+          nullable: true
+          example: cyc_01J9Z0QH3A
+        locale:
+          type: string
+          example: pt-BR
+
+    NavResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NavItem"
+
+    NavItem:
+      type: object
+      required: [id, label, path]
+      properties:
+        id:
+          type: string
+          example: members
+        label:
+          type: string
+          example: Integrantes
+        path:
+          type: string
+          example: /admin/members
+        icon:
+          type: string
+          nullable: true
+          example: users
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/NavItem"
+
+    DashboardOverviewResponse:
+      type: object
+      required: [counters]
+      properties:
+        counters:
+          type: object
+          additionalProperties:
+            type: integer
+          example:
+            pendingApprovals: 18
+            newMembers7d: 42
+            overdueInvoices: 3
+            eventsUpcoming7d: 5
+        highlights:
+          type: array
+          items:
+            $ref: "#/components/schemas/DashboardHighlight"
+
+    DashboardHighlight:
+      type: object
+      required: [type, title]
+      properties:
+        type:
+          type: string
+          enum: [INFO, WARNING, ACTION]
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        link:
+          type: string
+          nullable: true
+
+    MemberStatus:
+      type: string
+      enum: [PENDING, ACTIVE, SUSPENDED, INACTIVE, REJECTED]
+
+    MemberSummary:
+      type: object
+      required: [memberId, name, status]
+      properties:
+        memberId:
+          type: string
+          example: mem_01J9Z0B2QJ
+        name:
+          type: string
+          example: Carlos Pereira
+        email:
+          type: string
+          format: email
+          nullable: true
+          example: carlos@email.com
+        status:
+          $ref: "#/components/schemas/MemberStatus"
+        categoryId:
+          type: string
+          nullable: true
+        segmentId:
+          type: string
+          nullable: true
+        communityId:
+          type: string
+          nullable: true
+        nucleusId:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedMembersResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberSummary"
+        facets:
+          type: object
+          nullable: true
+          description: Optional facets for UI filters (counts per status/category/segment)
+          additionalProperties: true
+
+    MemberDetailResponse:
+      type: object
+      required: [member]
+      properties:
+        member:
+          $ref: "#/components/schemas/MemberDetail"
+        pointsSummary:
+          $ref: "#/components/schemas/PointsSummary"
+        approvalsHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovalHistoryItem"
+        structureLinks:
+          type: array
+          items:
+            $ref: "#/components/schemas/StructureLink"
+
+    MemberDetail:
+      type: object
+      required: [memberId, name, status, createdAt]
+      properties:
+        memberId:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        status:
+          $ref: "#/components/schemas/MemberStatus"
+        categoryId:
+          type: string
+          nullable: true
+        segmentId:
+          type: string
+          nullable: true
+        profile:
+          type: object
+          additionalProperties: true
+          description: Profile fields (domain-owned; BFF passes through normalized)
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ChangeMemberStatusRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/MemberStatus"
+        reasonCode:
+          type: string
+          nullable: true
+          example: POLICY_VIOLATION
+        note:
+          type: string
+          nullable: true
+          maxLength: 1000
+
+    MemberStatusChangeResponse:
+      type: object
+      required: [memberId, previousStatus, newStatus, changedAt]
+      properties:
+        memberId:
+          type: string
+        previousStatus:
+          $ref: "#/components/schemas/MemberStatus"
+        newStatus:
+          $ref: "#/components/schemas/MemberStatus"
+        changedAt:
+          type: string
+          format: date-time
+
+    MemberAssignRequest:
+      type: object
+      required: [assignments]
+      properties:
+        assignments:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Assignment"
+
+    Assignment:
+      type: object
+      required: [type, targetId]
+      properties:
+        type:
+          type: string
+          enum: [COMMUNITY, NUCLEUS, STRUCTURE_POSITION]
+        targetId:
+          type: string
+        roleId:
+          type: string
+          nullable: true
+        effectiveFrom:
+          type: string
+          format: date-time
+          nullable: true
+        effectiveTo:
+          type: string
+          format: date-time
+          nullable: true
+
+    MemberAssignResponse:
+      type: object
+      required: [memberId, applied]
+      properties:
+        memberId:
+          type: string
+        applied:
+          type: array
+          items:
+            $ref: "#/components/schemas/Assignment"
+
+    StructureLink:
+      type: object
+      required: [type, id, name]
+      properties:
+        type:
+          type: string
+          enum: [COMMUNITY, NUCLEUS, STRUCTURE]
+        id:
+          type: string
+        name:
+          type: string
+        roleName:
+          type: string
+          nullable: true
+
+    ApprovalState:
+      type: string
+      enum: [PENDING, IN_REVIEW, APPROVED, REJECTED, CHANGES_REQUESTED, CANCELED]
+
+    ApprovalSummary:
+      type: object
+      required: [approvalId, type, state, entityType, entityId, createdAt]
+      properties:
+        approvalId:
+          type: string
+        type:
+          type: string
+        state:
+          $ref: "#/components/schemas/ApprovalState"
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, URGENT]
+          nullable: true
+        entityType:
+          type: string
+          example: Member
+        entityId:
+          type: string
+        requester:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedApprovalsResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovalSummary"
+
+    ApprovalDetailResponse:
+      type: object
+      required: [approval]
+      properties:
+        approval:
+          $ref: "#/components/schemas/ApprovalDetail"
+
+    ApprovalDetail:
+      type: object
+      required: [approvalId, type, state, entityType, entityId, createdAt]
+      properties:
+        approvalId:
+          type: string
+        type:
+          type: string
+        state:
+          $ref: "#/components/schemas/ApprovalState"
+        entityType:
+          type: string
+        entityId:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+          description: Domain payload snapshot for UI rendering
+        decisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Decision"
+        createdAt:
+          type: string
+          format: date-time
+
+    Decision:
+      type: object
+      required: [decision, decidedBy, decidedAt]
+      properties:
+        decision:
+          type: string
+          enum: [APPROVE, REJECT, REQUEST_CHANGES]
+        reasonCode:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        decidedBy:
+          type: string
+        decidedAt:
+          type: string
+          format: date-time
+
+    ApprovalDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [APPROVE, REJECT, REQUEST_CHANGES]
+        reasonCode:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+          maxLength: 1500
+        expectedState:
+          $ref: "#/components/schemas/ApprovalState"
+
+    ApprovalDecisionResponse:
+      type: object
+      required: [approvalId, previousState, newState, decidedAt]
+      properties:
+        approvalId:
+          type: string
+        previousState:
+          $ref: "#/components/schemas/ApprovalState"
+        newState:
+          $ref: "#/components/schemas/ApprovalState"
+        decidedAt:
+          type: string
+          format: date-time
+
+    BulkApprovalDecisionRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/BulkApprovalDecisionItem"
+
+    BulkApprovalDecisionItem:
+      type: object
+      required: [approvalId, decision]
+      properties:
+        approvalId:
+          type: string
+        decision:
+          type: string
+          enum: [APPROVE, REJECT, REQUEST_CHANGES]
+        reasonCode:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        expectedState:
+          $ref: "#/components/schemas/ApprovalState"
+
+    BulkApprovalDecisionResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/BulkDecisionResult"
+
+    BulkDecisionResult:
+      type: object
+      required: [approvalId, success]
+      properties:
+        approvalId:
+          type: string
+        success:
+          type: boolean
+        error:
+          $ref: "#/components/schemas/ErrorResponse"
+
+    ApprovalHistoryItem:
+      type: object
+      required: [approvalId, state, decidedAt]
+      properties:
+        approvalId:
+          type: string
+        state:
+          $ref: "#/components/schemas/ApprovalState"
+        decidedAt:
+          type: string
+          format: date-time
+
+    MemberHistoryItem:
+      type: object
+      required: [type, occurredAt]
+      properties:
+        type:
+          type: string
+          example: STATUS_CHANGED
+        occurredAt:
+          type: string
+          format: date-time
+        actorId:
+          type: string
+          nullable: true
+        data:
+          type: object
+          additionalProperties: true
+
+    PagedMemberHistoryResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MemberHistoryItem"
+
+    StructureSummary:
+      type: object
+      required: [structureId, name, type]
+      properties:
+        structureId:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedStructuresResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StructureSummary"
+
+    CreateStructureRequest:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          example: COMMUNITY
+        parentId:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    UpdateStructureRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    StructureResponse:
+      type: object
+      required: [structureId, name, type]
+      properties:
+        structureId:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        parentId:
+          type: string
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    StructureDetailResponse:
+      type: object
+      required: [structure]
+      properties:
+        structure:
+          $ref: "#/components/schemas/StructureResponse"
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/StructureNode"
+        leaders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Leader"
+
+    StructureNode:
+      type: object
+      required: [id, name, type]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/StructureNode"
+
+    Leader:
+      type: object
+      required: [memberId, name, roleName]
+      properties:
+        memberId:
+          type: string
+        name:
+          type: string
+        roleName:
+          type: string
+
+    CommunitySummary:
+      type: object
+      required: [communityId, name]
+      properties:
+        communityId:
+          type: string
+        name:
+          type: string
+        membersCount:
+          type: integer
+          nullable: true
+
+    PagedCommunitiesResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommunitySummary"
+
+    CommunityDetailResponse:
+      type: object
+      required: [community]
+      properties:
+        community:
+          $ref: "#/components/schemas/CommunitySummary"
+        nuclei:
+          type: array
+          items:
+            $ref: "#/components/schemas/NucleusSummary"
+        leaders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Leader"
+
+    NucleusSummary:
+      type: object
+      required: [nucleusId, name]
+      properties:
+        nucleusId:
+          type: string
+        name:
+          type: string
+        membersCount:
+          type: integer
+          nullable: true
+
+    PagedNucleiResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NucleusSummary"
+
+    CycleStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, ARCHIVED]
+
+    CyclesResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CycleResponse"
+
+    CreateCycleRequest:
+      type: object
+      required: [name, startsAt, endsAt]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+
+    CycleResponse:
+      type: object
+      required: [cycleId, name, status, startsAt, endsAt]
+      properties:
+        cycleId:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/CycleStatus"
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+
+    CycleDetailResponse:
+      type: object
+      required: [cycle, phases, enabledBlocks]
+      properties:
+        cycle:
+          $ref: "#/components/schemas/CycleResponse"
+        phases:
+          type: array
+          items:
+            $ref: "#/components/schemas/CyclePhase"
+        enabledBlocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnabledBlock"
+
+    CyclePhase:
+      type: object
+      required: [phaseId, name, order]
+      properties:
+        phaseId:
+          type: string
+        name:
+          type: string
+        order:
+          type: integer
+        startsAt:
+          type: string
+          format: date-time
+          nullable: true
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    EnabledBlock:
+      type: object
+      required: [blockCode, enabled]
+      properties:
+        blockCode:
+          type: string
+          example: MEMBERSHIP_ONBOARDING
+        enabled:
+          type: boolean
+        phases:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: Optional list of phaseIds where enabled applies
+
+    EnableBlocksRequest:
+      type: object
+      required: [blocks]
+      properties:
+        blocks:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/EnabledBlock"
+
+    EnableBlocksResponse:
+      type: object
+      required: [cycleId, blocks]
+      properties:
+        cycleId:
+          type: string
+        blocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnabledBlock"
+
+    PointRuleSummary:
+      type: object
+      required: [ruleId, code, name, active]
+      properties:
+        ruleId:
+          type: string
+        code:
+          type: string
+          example: MEMBER_APPROVED
+        name:
+          type: string
+        active:
+          type: boolean
+        points:
+          type: integer
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    PagedPointRulesResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PointRuleSummary"
+
+    CreatePointRuleRequest:
+      type: object
+      required: [code, name, points, active]
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        points:
+          type: integer
+        active:
+          type: boolean
+        eligibility:
+          type: object
+          additionalProperties: true
+          description: Optional rule eligibility filters (e.g. cycleId, member segment, event type)
+        idempotencyKeyRequired:
+          type: boolean
+          default: true
+
+    UpdatePointRuleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        points:
+          type: integer
+        active:
+          type: boolean
+        eligibility:
+          type: object
+          additionalProperties: true
+
+    PointRuleResponse:
+      type: object
+      required: [ruleId, code, name, points, active]
+      properties:
+        ruleId:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        points:
+          type: integer
+        active:
+          type: boolean
+        eligibility:
+          type: object
+          additionalProperties: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    PointPlansResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PointPlanResponse"
+
+    UpdatePointPlanRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        quotas:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quota"
+        active:
+          type: boolean
+
+    PointPlanResponse:
+      type: object
+      required: [planId, name, active]
+      properties:
+        planId:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+        quotas:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quota"
+
+    Quota:
+      type: object
+      required: [code, limit]
+      properties:
+        code:
+          type: string
+          example: MONTHLY_POINTS_CAP
+        limit:
+          type: integer
+          example: 5000
+
+    PointsSummary:
+      type: object
+      required: [balance]
+      properties:
+        balance:
+          type: integer
+          example: 150
+        level:
+          type: string
+          nullable: true
+        lastGrantedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    PointLedgerEntry:
+      type: object
+      required: [entryId, memberId, points, sourceType, sourceId, createdAt]
+      properties:
+        entryId:
+          type: string
+        memberId:
+          type: string
+        points:
+          type: integer
+        ruleId:
+          type: string
+          nullable: true
+        sourceType:
+          type: string
+          example: Approval
+        sourceId:
+          type: string
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedPointLedgerResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PointLedgerEntry"
+
+    PointsRecalculateRequest:
+      type: object
+      required: [scope]
+      properties:
+        scope:
+          type: string
+          enum: [MEMBER, CYCLE, ORG]
+        memberId:
+         type: string
+         nullable: true
+        cycleId:
+          type: string
+          nullable: true
+        reason:
+          type: string
+          nullable: true
+
+    AsyncJobAcceptedResponse:
+      type: object
+      required: [jobId, status]
+      properties:
+        jobId:
+          type: string
+          example: job_01J9Z3C0MN
+        status:
+          type: string
+          enum:
+            - QUEUED
+            - RUNNING
+
+    EventStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, CANCELED, ARCHIVED]
+
+    EventSummary:
+      type: object
+      required:
+        - eventId
+        - name
+        - status
+        - startsAt
+      properties:
+        eventId:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/EventStatus"
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+        location:
+          type: string
+          nullable: true
+
+    PagedEventsResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        itms:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventSummary"
+
+    CreateEventRequest:
+      type: object
+      required: [name, startsAt]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        capacity:
+          type: integer
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+
+    EventResponse:
+      type: object
+      required: [eventId, name, status, startsAt]
+      properties:
+        eventId:
+          type: string
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/EventStatus"
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+        location:
+          type: string
+          nullable: true
+
+    EventDetailResponse:
+      type: object
+      required: [event]
+      properties:
+        event:
+          $ref: "#/components/schemas/EventResponse"
+        registrationsSummary:
+          type: object
+          additionalProperties:
+            type: integer
+          nullable: true
+        agnda:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          nullable: true
+        permissions:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    RegistrationSummary:
+      type: object
+      required: [registrationId, memberId, status, createdAt]
+      properties:
+        registrationId:
+          type: string
+        memberId:
+          type: string
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, CANCELED, WAITLIST]
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedRegistrationsResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegistrationSummary"
+
+    EventPermissionsRequest:
+      type: object
+      required:
+        - policy
+      properties:
+        policy:
+          type: object
+          additionalProperties: true
+          description: Event-specific access policy (RBAC/ABAC)
+
+    EventPermissionsResponse:
+      type: object
+      required: [eventId, policy]
+      properties:
+        eventId:
+          type: string
+        policy:
+          type: object
+          additionalProperties: true
+
+    InvoiceSummary:
+      type: object
+      required: [invoiceId, status, amount, issuedAt]
+      properties:
+        invoiceId:
+          type: string
+        memberId:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [DRAFT, ISSUED, PAID, OVERDUE, CANCELED]
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+          example: BRL
+        issuedAt:
+          type: string
+          format: date-time
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    PagedInvoicesResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceSummary"
+
+    PaymentSummary:
+      type: object
+      required: [paymentId, status, amount, createdAt]
+      properties:
+        paymentId:
+          type: string
+        invoiceId:
+          type: string
+          nullable: true
+        provider:
+          type: string
+          example: STRIPE
+        status:
+          type: string
+          enum: [AUTHORIZED, CAPTURED, FAILED, REFUNDED]
+        amount:
+          type: number
+          format: double
+        currency:
+          type: string
+          example: BRL
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedPaymentsResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentSummary"
+
+    BillingReconcileRequest:
+      type: object
+      properties:
+        from:
+          type: string
+          format: date-time
+          nullable: true
+        to:
+          type: string
+          format: date-time
+          nullable: true
+        provider:
+          type: string
+          nullable: true
+
+    RefundRequest:
+      type: object
+      required: [paymentId, amount]
+      properties:
+        paymentId:
+          type: string
+        amount:
+          type: number
+          format: double
+        reason:
+          type: string
+          nullable: true
+
+    NotificationSummary:
+      type: object
+      required: [notificationId, status, title, createdAt]
+      properties:
+        notificationId:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, SCHEDULED, SENDING, SENT, FAILED]
+        title:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedNotificationsResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationSummary"
+
+    CreateNotificationRequest:
+      type: object
+      required: [title, channel, audience]
+      properties:
+        title:
+          type: string
+        channel:
+          type: string
+          enum: [EMAIL, WHATSAPP, PUSH, SMS]
+        audience:
+          $ref: "#/components/schemas/AudienceSelector"
+        templateId:
+          type: string
+          nullable: true
+        variables:
+          type: object
+          additionalProperties: true
+          nullable: true
+        scheduleAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    NotificationResponse:
+      type: object
+      required: [notificationId, status, title]
+      properties:
+        notificationId:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, SCHEDULED, SENDING, SENT, FAILED]
+        title:
+          type: string
+
+    NewsletterSummary:
+      type: object
+      required: [newsletterId, status, subject, createdAt]
+      properties:
+        newsletterId:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, SCHEDULED, SENDING, SENT, FAILED]
+        subject:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedNewslettersResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NewsletterSummary"
+
+    CreateNewsletterRequest:
+      type: object
+      required: [subject, audience]
+      properties:
+        subject:
+          type: string
+        templateId:
+          type: string
+          nullable: true
+        audience:
+          $ref: "#/components/schemas/AudienceSelector"
+        variables:
+          type: object
+          additionalProperties: true
+          nullable: true
+        scheduleAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    NewsletterResponse:
+      type: object
+      required: [newsletterId, status, subject]
+      properties:
+        newsletterId:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, SCHEDULED, SENDING, SENT, FAILED]
+        subject:
+          type: string
+
+    AudienceSelector:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [ALL, FILTERED, IDS]
+        filters:
+          type: object
+          additionalProperties: true
+          nullable: true
+        ids:
+          type: array
+          items:
+            type: string
+          nullable: true
+
+    EmailTemplatesResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmailTemplateResponse"
+
+    EmailTemplateResponse:
+      type: object
+      required: [templateId, name, engine, updatedAt]
+      properties:
+        templateId:
+          type: string
+        name:
+          type: string
+        engine:
+          type: string
+          enum: [HANDLEBARS, MJML, HTML]
+        subject:
+          type: string
+          nullable: true
+        body:
+          type: string
+          description: Template content
+        updatedAt:
+          type: string
+          format: date-time
+
+    UpdateEmailTemplateRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        subject:
+          type: string
+          nullable: true
+        body:
+          type: string
+
+    PreviewRequest:
+      type: object
+      required: [templateId, variables]
+      properties:
+        templateId:
+          type: string
+        variables:
+          type: object
+          additionalProperties: true
+        locale:
+          type: string
+          nullable: true
+          enum: [pt-BR, en, es]
+
+    PreviewResponse:
+      type: object
+      required: [rendered]
+      properties:
+        rendered:
+          type: object
+          required: [subject, body]
+          properties:
+            subject:
+              type: string
+            body:
+              type: string
+
+    NpsCampaignSummary:
+      type: object
+      required: [campaignId, name, status, createdAt]
+      properties:
+        campaignId:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED, CLOSED]
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedNpsCampaignsResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/NpsCampaignSummary"
+
+    CreateNpsCampaignRequest:
+      type: object
+      required: [name, audience, startsAt]
+      properties:
+        name:
+          type: string
+        audience:
+          $ref: "#/components/schemas/AudienceSelector"
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    NpsCampaignResponse:
+      type: object
+      required: [campaignId, name, status]
+      properties:
+        campaignId:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED, CLOSED]
+
+    NpsResultsResponse:
+      type: object
+      required: [campaignId, npsScore, counts]
+      properties:
+        campaignId:
+          type: string
+        npsScore:
+          type: number
+          format: double
+        counts:
+          type: object
+          required: [promoters, passives, detractors, total]
+          properties:
+            promoters:
+              type: integer
+            passives:
+              type: integer
+            detractors:
+              type: integer
+            total:
+              type: integer
+        trends:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          nullable: true
+
+    AuditLogItem:
+      type: object
+      required: [logId, action, occurredAt]
+      properties:
+        logId:
+          type: string
+        action:
+          type: string
+        actorId:
+          type: string
+          nullable: true
+        entityType:
+          type: string
+          nullable: true
+        entityId:
+          type: string
+          nullable: true
+        occurredAt:
+          type: string
+          format: date-time
+        data:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    PagedAuditLogsResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogItem"
+
+    AuditTrailItem:
+      type: object
+      required: [trailId, type, occurredAt]
+      properties:
+        trailId:
+          type: string
+        type:
+          type: string
+          example: APPROVAL_DECIDED
+        occurredAt:
+          type: string
+          format: date-time
+        actorId:
+          type: string
+          nullable: true
+        before:
+          type: object
+          additionalProperties: true
+          nullable: true
+        after:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    PagedAuditTrailResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditTrailItem"
+
+    ControlAlertItem:
+      type: object
+      required: [alertId, severity, state, title, createdAt]
+      properties:
+        alertId:
+          type: string
+        severity:
+          type: string
+          enum: [INFO, LOW, MEDIUM, HIGH, CRITICAL]
+        state:
+          type: string
+          enum: [OPEN, ACKED, RESOLVED]
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedControlAlertsResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ControlAlertItem"
+
+    SupplierSummary:
+      type: object
+      required: [supplierId, name, status]
+      properties:
+        supplierId:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    PagedSuppliersResponse:
+      type: object
+      required: [meta, items]
+      properties:
+        meta:
+          $ref: "#/components/schemas/PagedMeta"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SupplierSummary"
+
+    CreateSupplierRequest:
+      type: object
+      required: [name, status]
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        contact:
+          type: object
+          additionalProperties: true
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true
+
+    UpdateSupplierRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+        contact:
+          type: object
+          additionalProperties: true
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+          nullable: true

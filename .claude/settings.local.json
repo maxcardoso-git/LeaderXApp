@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(scp:*)",
+      "Bash(ssh root@72.61.52.70 \"cat ~/LeaderXApp/.env 2>/dev/null || cat ~/LeaderXApp/.env.local 2>/dev/null || echo ''Nenhum .env encontrado''\")",
+      "Bash(ssh root@72.61.52.70 \"find ~ -name ''.env*'' -o -name ''*.env'' 2>/dev/null | head -20\")"
+    ]
+  }
+}

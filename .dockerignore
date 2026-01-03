@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+npm-debug.log
+
+# Build output
+dist
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Test files
+coverage
+*.spec.ts
+*.test.ts
+test/
+jest.config.js
+
+# Documentation
+README.md
+docs/
+
+# CI/CD
+.github
+
+# Misc
+.DS_Store
+*.log

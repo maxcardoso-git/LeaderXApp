@@ -1,0 +1,79 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// INFRASTRUCTURE TABLES
+// ============================================================================
+
+/// Idempotency records for ensuring exactly-once processing of mutations
+model IdempotencyRecord {
+  id              String   @id @default(uuid())
+  scope           String   /// Operation scope (e.g., "approvals.decide", "approvals.bulkDecide")
+  idemKey         String   @map("idem_key") /// Idempotency-Key header value
+  tenantId        String   @map("tenant_id")
+  status          String   /// IN_PROGRESS | COMPLETED | FAILED
+  requestHash     String   @map("request_hash") /// SHA256 hash of request body
+  httpStatus      Int?     @map("http_status") /// HTTP status code of cached response
+  responsePayload Json?    @map("response_payload") /// Cached response body
+  errorPayload    Json?    @map("error_payload") /// Error details if failed
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  expiresAt       DateTime @map("expires_at")
+
+  @@unique([scope, idemKey, tenantId], name: "ux_idem_scope_key_tenant")
+  @@index([expiresAt], name: "ix_idem_expires")
+  @@index([tenantId], name: "ix_idem_tenant")
+  @@map("idempotency_records")
+}
+
+/// Outbox events for reliable event publishing (transactional outbox pattern)
+model OutboxEvent {
+  id            String    @id @default(uuid())
+  eventType     String    @map("event_type") /// Event type (e.g., "approval.decided")
+  aggregateType String    @map("aggregate_type") /// Aggregate type (e.g., "Approval")
+  aggregateId   String    @map("aggregate_id") /// Aggregate ID
+  correlationId String?   @map("correlation_id") /// Request correlation ID
+  payload       Json      /// Event payload
+  metadata      Json?     /// Additional metadata
+  status        String    @default("PENDING") /// PENDING | PROCESSING | PUBLISHED | DEAD
+  retryCount    Int       @default(0) @map("retry_count")
+  maxRetries    Int       @default(5) @map("max_retries")
+  lastError     String?   @map("last_error")
+  processedAt   DateTime? @map("processed_at")
+  scheduledAt   DateTime  @default(now()) @map("scheduled_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([status, scheduledAt], name: "ix_outbox_status_scheduled")
+  @@index([aggregateType, aggregateId], name: "ix_outbox_aggregate")
+  @@index([correlationId], name: "ix_outbox_correlation")
+  @@map("outbox_events")
+}
+
+/// Job executions for tracking background jobs (optional)
+model JobExecution {
+  id           String    @id @default(uuid())
+  jobType      String    @map("job_type") /// Job type identifier
+  jobKey       String    @map("job_key") /// Unique job key for deduplication
+  status       String    @default("STARTED") /// STARTED | SUCCEEDED | FAILED
+  attempts     Int       @default(0)
+  lastError    String?   @map("last_error")
+  metadata     Json?     /// Additional job metadata
+  startedAt    DateTime  @default(now()) @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  @@unique([jobType, jobKey], name: "ux_job_type_key")
+  @@index([status], name: "ix_job_status")
+  @@map("job_executions")
+}

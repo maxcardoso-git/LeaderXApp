@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  admin-bff:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: leaderx-admin-bff
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - CORE_API_BASE_URL=${CORE_API_BASE_URL}
+      - CORE_API_TOKEN=${CORE_API_TOKEN}
+      - OUTBOX_WORKER_ENABLED=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - leaderx-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: leaderx-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-leaderx}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-leaderx}
+      - POSTGRES_DB=${POSTGRES_DB:-leaderx_admin_bff}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - leaderx-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-leaderx}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  leaderx-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
