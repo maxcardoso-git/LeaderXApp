@@ -1,0 +1,1084 @@
+openapi: 3.0.3
+info:
+  title: LeaderX Core API
+  description: |
+    Core API for LeaderX Platform - Decision Intelligence Engine.
+
+    This API provides the backend services for:
+    - Approval management (create, list, decide)
+    - Points/scoring calculation
+    - Audit logging
+    - Communications/notifications
+
+    ## Authentication
+    All endpoints require Bearer token authentication and tenant context headers.
+
+    ## Multi-tenancy
+    The API is multi-tenant. Every request must include:
+    - `X-Tenant-Id`: The tenant identifier
+    - `X-Org-Id`: The organization identifier within the tenant
+    - `X-Cycle-Id` (optional): The evaluation cycle identifier
+  version: 1.0.0
+  contact:
+    name: LeaderX Team
+    email: team@leaderx.io
+
+servers:
+  - url: http://localhost:3001
+    description: Local development
+  - url: https://api.leaderx.io
+    description: Production
+
+tags:
+  - name: Approvals
+    description: Approval request management
+  - name: Points
+    description: Points and scoring calculation
+  - name: Audit
+    description: Audit logging
+  - name: Communications
+    description: Notifications and communications
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ============================================
+  # APPROVALS
+  # ============================================
+  /approvals:
+    get:
+      tags:
+        - Approvals
+      summary: List approval requests
+      description: Returns a paginated list of approval requests with optional filters
+      operationId: listApprovals
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XOrgId'
+        - $ref: '#/components/parameters/XCycleId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/AcceptLanguage'
+        - name: state
+          in: query
+          description: Filter by approval state
+          schema:
+            $ref: '#/components/schemas/ApprovalState'
+        - name: type
+          in: query
+          description: Filter by approval type
+          schema:
+            type: string
+            example: SALARY_INCREASE
+        - name: priority
+          in: query
+          description: Filter by priority level
+          schema:
+            $ref: '#/components/schemas/Priority'
+        - name: q
+          in: query
+          description: Search query (searches candidate name, type)
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: Page number (0-indexed)
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          description: Page size
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+        - name: sort
+          in: query
+          description: Sort field and direction (e.g., createdAt,desc)
+          schema:
+            type: string
+            default: createdAt,desc
+      responses:
+        '200':
+          description: Paginated list of approvals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedApprovalsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags:
+        - Approvals
+      summary: Create approval request
+      description: Creates a new approval request
+      operationId: createApproval
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XOrgId'
+        - $ref: '#/components/parameters/XCycleId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateApprovalRequest'
+      responses:
+        '201':
+          description: Approval created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+
+  /approvals/{approvalId}:
+    get:
+      tags:
+        - Approvals
+      summary: Get approval details
+      description: Returns detailed information about a specific approval request
+      operationId: getApproval
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XOrgId'
+        - $ref: '#/components/parameters/XCycleId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/ApprovalId'
+      responses:
+        '200':
+          description: Approval details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /approvals/{approvalId}/decision:
+    post:
+      tags:
+        - Approvals
+      summary: Decide an approval
+      description: |
+        Submit a decision (approve/reject/request changes) for an approval request.
+        This is an idempotent operation - requires Idempotency-Key header.
+      operationId: decideApproval
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XOrgId'
+        - $ref: '#/components/parameters/XCycleId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/ApprovalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Decision applied successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalDecisionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+        '422':
+          description: Invalid state transition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /approvals/bulk/decision:
+    post:
+      tags:
+        - Approvals
+      summary: Bulk decide approvals
+      description: |
+        Submit the same decision for multiple approval requests.
+        This is an idempotent operation - requires Idempotency-Key header.
+      operationId: bulkDecideApprovals
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XOrgId'
+        - $ref: '#/components/parameters/XCycleId'
+        - $ref: '#/components/parameters/XRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Bulk decision results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkApprovalDecisionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/IdempotencyConflict'
+
+  # ============================================
+  # POINTS
+  # ============================================
+  /points/recalculate:
+    post:
+      tags:
+        - Points
+      summary: Recalculate points for a candidate
+      description: |
+        Triggers a points recalculation for a specific candidate.
+        This is typically called after an approval decision that affects scoring.
+      operationId: recalculatePoints
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XOrgId'
+        - $ref: '#/components/parameters/XCycleId'
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecalculatePointsRequest'
+      responses:
+        '200':
+          description: Points recalculated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecalculatePointsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Candidate not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /points/candidates/{candidateId}:
+    get:
+      tags:
+        - Points
+      summary: Get candidate points
+      description: Returns the current points/score for a specific candidate
+      operationId: getCandidatePoints
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XOrgId'
+        - $ref: '#/components/parameters/XCycleId'
+        - $ref: '#/components/parameters/XRequestId'
+        - name: candidateId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Candidate points
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CandidatePointsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================
+  # AUDIT
+  # ============================================
+  /audit/logs:
+    post:
+      tags:
+        - Audit
+      summary: Create audit log entry
+      description: Creates a new audit log entry for tracking actions
+      operationId: createAuditLog
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XOrgId'
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAuditLogRequest'
+      responses:
+        '201':
+          description: Audit log created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateAuditLogResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    get:
+      tags:
+        - Audit
+      summary: List audit logs
+      description: Returns a paginated list of audit log entries
+      operationId: listAuditLogs
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XOrgId'
+        - $ref: '#/components/parameters/XRequestId'
+        - name: resourceType
+          in: query
+          schema:
+            type: string
+        - name: resourceId
+          in: query
+          schema:
+            type: string
+        - name: actorId
+          in: query
+          schema:
+            type: string
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          description: Start date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: End date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated audit logs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedAuditLogsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================
+  # COMMUNICATIONS
+  # ============================================
+  /communications/notifications:
+    post:
+      tags:
+        - Communications
+      summary: Send notification
+      description: Sends a notification to a recipient via specified channel
+      operationId: sendNotification
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XOrgId'
+        - $ref: '#/components/parameters/XRequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendNotificationRequest'
+      responses:
+        '200':
+          description: Notification sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SendNotificationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /communications/templates:
+    get:
+      tags:
+        - Communications
+      summary: List notification templates
+      description: Returns available notification templates
+      operationId: listNotificationTemplates
+      parameters:
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/XOrgId'
+      responses:
+        '200':
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationTemplate'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================
+  # HEALTH
+  # ============================================
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Returns service health status
+      operationId: healthCheck
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    XTenantId:
+      name: X-Tenant-Id
+      in: header
+      required: true
+      description: Tenant identifier
+      schema:
+        type: string
+        example: tenant-123
+
+    XOrgId:
+      name: X-Org-Id
+      in: header
+      required: true
+      description: Organization identifier
+      schema:
+        type: string
+        example: org-456
+
+    XCycleId:
+      name: X-Cycle-Id
+      in: header
+      required: false
+      description: Evaluation cycle identifier
+      schema:
+        type: string
+        example: cycle-2024-Q1
+
+    XRequestId:
+      name: X-Request-Id
+      in: header
+      required: false
+      description: Request correlation ID for tracing
+      schema:
+        type: string
+        format: uuid
+
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Unique key for idempotent operations
+      schema:
+        type: string
+        example: a1b2c3d4-e5f6-7890
+
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      description: Preferred language for responses
+      schema:
+        type: string
+        default: pt-BR
+
+    ApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      description: Approval request identifier
+      schema:
+        type: string
+        example: apr-001
+
+  schemas:
+    # ============================================
+    # COMMON
+    # ============================================
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: Resource not found
+        code:
+          type: string
+          example: NOT_FOUND
+        details:
+          type: object
+          additionalProperties: true
+        requestId:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+
+    Priority:
+      type: string
+      enum:
+        - LOW
+        - MEDIUM
+        - HIGH
+        - URGENT
+      example: HIGH
+
+    ApprovalState:
+      type: string
+      enum:
+        - PENDING
+        - APPROVED
+        - REJECTED
+        - CHANGES_REQUESTED
+      example: PENDING
+
+    Decision:
+      type: string
+      enum:
+        - APPROVE
+        - REJECT
+        - REQUEST_CHANGES
+      example: APPROVE
+
+    # ============================================
+    # APPROVALS
+    # ============================================
+    CreateApprovalRequest:
+      type: object
+      required:
+        - type
+        - candidateId
+      properties:
+        type:
+          type: string
+          description: Type of approval (e.g., SALARY_INCREASE, PROMOTION, BONUS)
+          example: SALARY_INCREASE
+        candidateId:
+          type: string
+          description: ID of the candidate being evaluated
+          example: cand-001
+        candidateName:
+          type: string
+          description: Name of the candidate (denormalized for display)
+          example: João Silva
+        priority:
+          $ref: '#/components/schemas/Priority'
+        metadata:
+          type: object
+          description: Additional type-specific data
+          additionalProperties: true
+          example:
+            percentageIncrease: 15
+            currentSalary: 5000
+
+    ApprovalDetailResponse:
+      type: object
+      required:
+        - id
+        - type
+        - state
+        - priority
+        - createdAt
+      properties:
+        id:
+          type: string
+          example: apr-001
+        type:
+          type: string
+          example: SALARY_INCREASE
+        state:
+          $ref: '#/components/schemas/ApprovalState'
+        candidateId:
+          type: string
+          example: cand-001
+        candidateName:
+          type: string
+          example: João Silva
+        priority:
+          $ref: '#/components/schemas/Priority'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type: string
+          format: date-time
+        decidedBy:
+          type: string
+          description: ID of the user who made the decision
+        decisionReason:
+          type: string
+          description: Reason provided for the decision
+        metadata:
+          type: object
+          additionalProperties: true
+
+    PagedApprovalsResponse:
+      type: object
+      required:
+        - items
+        - page
+        - size
+        - total
+        - totalPages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApprovalDetailResponse'
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 10
+        total:
+          type: integer
+          example: 42
+        totalPages:
+          type: integer
+          example: 5
+
+    ApprovalDecisionRequest:
+      type: object
+      required:
+        - decision
+      properties:
+        decision:
+          $ref: '#/components/schemas/Decision'
+        reason:
+          type: string
+          description: Optional reason for the decision
+          example: Performance metrics exceeded expectations
+
+    ApprovalDecisionResponse:
+      type: object
+      required:
+        - id
+        - status
+      properties:
+        id:
+          type: string
+          example: apr-001
+        status:
+          type: string
+          example: DECIDED
+        message:
+          type: string
+          example: Approval apr-001 decided as APPROVE
+        newState:
+          $ref: '#/components/schemas/ApprovalState'
+
+    BulkApprovalDecisionRequest:
+      type: object
+      required:
+        - approvalIds
+        - decision
+      properties:
+        approvalIds:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 100
+          example: ['apr-001', 'apr-002', 'apr-003']
+        decision:
+          $ref: '#/components/schemas/Decision'
+        reason:
+          type: string
+
+    BulkApprovalDecisionResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            required:
+              - approvalId
+              - success
+            properties:
+              approvalId:
+                type: string
+              success:
+                type: boolean
+              error:
+                type: string
+              newState:
+                $ref: '#/components/schemas/ApprovalState'
+        summary:
+          type: object
+          properties:
+            total:
+              type: integer
+            succeeded:
+              type: integer
+            failed:
+              type: integer
+
+    # ============================================
+    # POINTS
+    # ============================================
+    RecalculatePointsRequest:
+      type: object
+      required:
+        - candidateId
+      properties:
+        candidateId:
+          type: string
+          example: cand-001
+        reason:
+          type: string
+          description: Reason for recalculation (for audit)
+          example: Approval decision changed
+
+    RecalculatePointsResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+          example: Points recalculated for candidate cand-001
+        previousScore:
+          type: number
+          example: 75
+        newScore:
+          type: number
+          example: 85
+        delta:
+          type: number
+          example: 10
+
+    CandidatePointsResponse:
+      type: object
+      required:
+        - candidateId
+        - score
+      properties:
+        candidateId:
+          type: string
+        score:
+          type: number
+          example: 85
+        rank:
+          type: integer
+          description: Rank among all candidates in the cycle
+          example: 12
+        breakdown:
+          type: object
+          description: Score breakdown by category
+          additionalProperties:
+            type: number
+        lastUpdated:
+          type: string
+          format: date-time
+
+    # ============================================
+    # AUDIT
+    # ============================================
+    CreateAuditLogRequest:
+      type: object
+      required:
+        - action
+        - resourceType
+        - resourceId
+        - actorId
+      properties:
+        action:
+          type: string
+          description: Action performed
+          example: APPROVAL_DECIDED
+        resourceType:
+          type: string
+          description: Type of resource affected
+          example: APPROVAL
+        resourceId:
+          type: string
+          description: ID of the resource affected
+          example: apr-001
+        actorId:
+          type: string
+          description: ID of the user/system performing the action
+          example: user-123
+        timestamp:
+          type: string
+          format: date-time
+          description: When the action occurred (defaults to now)
+        metadata:
+          type: object
+          description: Additional context about the action
+          additionalProperties: true
+        correlationId:
+          type: string
+          description: Correlation ID for request tracing
+
+    CreateAuditLogResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+        auditLogId:
+          type: string
+          example: audit-abc123
+        message:
+          type: string
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        action:
+          type: string
+        resourceType:
+          type: string
+        resourceId:
+          type: string
+        actorId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+        correlationId:
+          type: string
+
+    PagedAuditLogsResponse:
+      type: object
+      required:
+        - items
+        - page
+        - size
+        - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLogEntry'
+        page:
+          type: integer
+        size:
+          type: integer
+        total:
+          type: integer
+
+    # ============================================
+    # COMMUNICATIONS
+    # ============================================
+    SendNotificationRequest:
+      type: object
+      required:
+        - recipientId
+        - message
+      properties:
+        recipientId:
+          type: string
+          description: ID of the notification recipient
+          example: user-123
+        templateId:
+          type: string
+          description: Optional template ID to use
+          example: approval-decided
+        channel:
+          type: string
+          enum:
+            - EMAIL
+            - PUSH
+            - SMS
+          default: PUSH
+        subject:
+          type: string
+          description: Notification subject (for email)
+          example: Aprovação Concedida
+        message:
+          type: string
+          description: Notification message body
+          example: Sua solicitação de aumento foi aprovada.
+        metadata:
+          type: object
+          description: Additional data for template rendering
+          additionalProperties: true
+
+    SendNotificationResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+        notificationId:
+          type: string
+          example: notif-xyz789
+        message:
+          type: string
+          example: Notification sent via EMAIL
+
+    NotificationTemplate:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        channel:
+          type: string
+        subject:
+          type: string
+        body:
+          type: string
+        variables:
+          type: array
+          items:
+            type: string
+
+    # ============================================
+    # HEALTH
+    # ============================================
+    HealthResponse:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - healthy
+            - degraded
+            - unhealthy
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        uptime:
+          type: number
+          description: Uptime in seconds
+        checks:
+          type: object
+          additionalProperties:
+            type: string
+            enum:
+              - up
+              - down
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Authentication required or invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    IdempotencyConflict:
+      description: Request with same Idempotency-Key is still processing
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ErrorResponse'
+              - type: object
+                properties:
+                  retryAfter:
+                    type: integer
+                    description: Seconds to wait before retrying
