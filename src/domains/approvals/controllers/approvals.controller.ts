@@ -17,28 +17,72 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
+import {
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsInt,
+  IsArray,
+  Min,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApprovalsFacade } from '../facades/approvals.facade';
 import { ErrorResponse } from '../../../common/errors/error-response.interface';
 
 // DTOs
 class DecisionDto {
+  @IsEnum(['APPROVE', 'REJECT', 'REQUEST_CHANGES'])
   decision: 'APPROVE' | 'REJECT' | 'REQUEST_CHANGES';
+
+  @IsOptional()
+  @IsString()
   reason?: string;
 }
 
 class BulkDecisionDto {
+  @IsArray()
+  @IsString({ each: true })
   approvalIds: string[];
+
+  @IsEnum(['APPROVE', 'REJECT', 'REQUEST_CHANGES'])
   decision: 'APPROVE' | 'REJECT' | 'REQUEST_CHANGES';
+
+  @IsOptional()
+  @IsString()
   reason?: string;
 }
 
 class ListQueryDto {
+  @IsOptional()
+  @IsString()
   state?: string;
+
+  @IsOptional()
+  @IsString()
   type?: string;
+
+  @IsOptional()
+  @IsEnum(['LOW', 'MEDIUM', 'HIGH', 'URGENT'])
   priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+  @IsOptional()
+  @IsString()
   q?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
   page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   size?: number;
+
+  @IsOptional()
+  @IsString()
   sort?: string;
 }
 

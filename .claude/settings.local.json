@@ -10,7 +10,18 @@
       "Bash(git push)",
       "Bash(npm run lint:*)",
       "Bash(npm run build:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(ssh root@72.61.52.70 \"which psql && systemctl status postgresql | head -5 || service postgresql status | head -5\")",
+      "Bash(ssh root@72.61.52.70 \"sudo -u postgres psql -c \"\"CREATE USER leaderx_bff WITH PASSWORD ''leaderx_bff_2024'';\"\" 2>/dev/null || echo ''User may already exist''\")",
+      "Bash(ssh root@72.61.52.70 \"sudo -u postgres psql -c \"\"CREATE DATABASE leaderx_admin_bff OWNER leaderx_bff;\"\" 2>/dev/null || echo ''Database may already exist''\")",
+      "Bash(ssh:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(export DATABASE_URL:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npm run start:dev:*)",
+      "Bash(cat:*)",
+      "Bash(curl:*)"
     ]
   }
 }
