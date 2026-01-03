@@ -14,9 +14,12 @@ export class OutboxRepository {
 
   /**
    * Create a new outbox event
+   * @param dto Event data
+   * @param tx Optional Prisma transaction client for atomic operations
    */
-  async create(dto: CreateOutboxEventDto): Promise<OutboxEvent> {
-    const record = await this.prisma.outboxEvent.create({
+  async create(dto: CreateOutboxEventDto, tx?: Parameters<Parameters<typeof this.prisma.$transaction>[0]>[0]): Promise<OutboxEvent> {
+    const client = tx ?? this.prisma;
+    const record = await client.outboxEvent.create({
       data: {
         eventType: dto.eventType,
         aggregateType: dto.aggregateType,

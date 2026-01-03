@@ -21,7 +21,10 @@
       "Bash(npx prisma db push:*)",
       "Bash(npm run start:dev:*)",
       "Bash(cat:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(PGPASSWORD=leaderx psql:*)",
+      "Bash(PGPASSWORD=postgres psql:*)"
     ]
   }
 }
