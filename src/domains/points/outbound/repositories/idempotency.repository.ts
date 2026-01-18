@@ -13,14 +13,21 @@ type PrismaClient = PrismaService | Parameters<Parameters<PrismaService['$transa
  * Idempotency scope constants
  */
 export const IdempotencyScope = {
+  // Points
   CREDIT_POINTS: 'POINTS:CreditPoints',
   DEBIT_POINTS: 'POINTS:DebitPoints',
   HOLD_POINTS: 'POINTS:HoldPoints',
   RELEASE_HOLD: 'POINTS:ReleaseHold',
   COMMIT_HOLD: 'POINTS:CommitHold',
+  // Reservations
   CREATE_RESERVATION: 'RESERVATIONS:CreateReservation',
   CONFIRM_RESERVATION: 'RESERVATIONS:ConfirmReservation',
   RELEASE_RESERVATION: 'RESERVATIONS:ReleaseReservation',
+  // Identity
+  IDENTITY_CREATE_USER: 'IDENTITY:CreateUser',
+  IDENTITY_CREATE_PERMISSION: 'IDENTITY:CreatePermission',
+  IDENTITY_CREATE_ROLE: 'IDENTITY:CreateRole',
+  IDENTITY_ASSIGN_ROLE: 'IDENTITY:AssignRole',
 } as const;
 
 export interface IdempotencyRecord {

@@ -19,6 +19,15 @@ import { PointsModule } from './domains/points';
 // Reservations Domain
 import { ReservationsModule } from './domains/reservations/reservations.module';
 
+// Identity Domain
+import { IdentityModule } from './domains/identity';
+
+// Events Domain
+import { EventsModule } from './domains/events/events.module';
+
+// Governance Domain
+import { GovernanceModule } from './domains/governance/governance.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -27,6 +36,9 @@ import { ReservationsModule } from './domains/reservations/reservations.module';
     CqrsModule,
     PointsModule,
     ReservationsModule,
+    IdentityModule,
+    EventsModule,
+    GovernanceModule,
   ],
   controllers: [ApprovalsController],
   providers: [
