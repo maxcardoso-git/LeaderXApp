@@ -28,6 +28,9 @@ import { EventsModule } from './domains/events/events.module';
 // Governance Domain
 import { GovernanceModule } from './domains/governance/governance.module';
 
+// Audit & Compliance Domain
+import { AuditModule } from './domains/audit/audit.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -39,6 +42,7 @@ import { GovernanceModule } from './domains/governance/governance.module';
     IdentityModule,
     EventsModule,
     GovernanceModule,
+    AuditModule,
   ],
   controllers: [ApprovalsController],
   providers: [

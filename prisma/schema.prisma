@@ -586,3 +586,69 @@ model GovernanceAuditLog {
   @@index([evaluatedAt])
   @@map("governance_audit_logs")
 }
+
+// ============================================
+// AUDIT & COMPLIANCE DOMAIN
+// ============================================
+
+/// ComplianceCheck - rule definition for compliance validation
+model ComplianceCheck {
+  id          String   @id @default(uuid())
+  tenantId    String?  @map("tenant_id")
+  code        String   @unique
+  name        String
+  description String?
+  severity    String   @default("MEDIUM") // LOW | MEDIUM | HIGH | CRITICAL
+  rules       Json     // ComplianceRules: { type: 'RULE_SET', rules: [] }
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  results ComplianceCheckResult[]
+
+  @@index([tenantId])
+  @@index([enabled])
+  @@index([severity])
+  @@map("compliance_checks")
+}
+
+/// ComplianceCheckResult - result of a single compliance check execution
+model ComplianceCheckResult {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  checkId    String   @map("check_id")
+  checkCode  String   @map("check_code")
+  reportId   String?  @map("report_id")
+  status     String   // PASS | FAIL | WARNING
+  evidence   Json?    // array of evidence items
+  executedAt DateTime @default(now()) @map("executed_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  check  ComplianceCheck   @relation(fields: [checkId], references: [id])
+  report ComplianceReport? @relation(fields: [reportId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, checkCode])
+  @@index([tenantId, reportId])
+  @@index([tenantId, status])
+  @@index([executedAt])
+  @@map("compliance_check_results")
+}
+
+/// ComplianceReport - snapshot of compliance execution results
+model ComplianceReport {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  summary     Json     // ComplianceSummary: { totalChecks, passed, failed, warnings }
+  generatedAt DateTime @default(now()) @map("generated_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  results ComplianceCheckResult[]
+
+  @@index([tenantId])
+  @@index([generatedAt])
+  @@map("compliance_reports")
+}
