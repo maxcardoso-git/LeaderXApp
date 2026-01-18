@@ -1,64 +1,47 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { ScheduleModule } from '@nestjs/schedule';
-import { APP_FILTER } from '@nestjs/core';
+import { CqrsModule } from '@nestjs/cqrs';
 
 // Infrastructure
-import { PrismaModule } from './infrastructure/prisma/prisma.module';
+import { PrismaService } from '@infrastructure/persistence/prisma.service';
+import { ApprovalRepository } from '@infrastructure/persistence/approvals/approval.repository';
+import { ApprovalsController } from '@infrastructure/http/approvals/approvals.controller';
 
-// Common modules
-import { RequestContextModule } from './common/request-context/request-context.module';
-import { RequestContextMiddleware } from './common/request-context/request-context.middleware';
-import { ErrorsModule } from './common/errors/errors.module';
-import { AllExceptionsFilter } from './common/errors/all-exceptions.filter';
-import { RetryModule } from './common/retry/retry.module';
-import { IdempotencyModule } from './common/idempotency/idempotency.module';
-import { EventingModule } from './common/eventing/eventing.module';
-import { OutboxModule } from './common/outbox/outbox.module';
+// Application
+import { CommandHandlers, QueryHandlers } from '@application/approvals';
 
-// Domain modules
-import { ApprovalsModule } from './domains/approvals/approvals.module';
+// Domain
+import { APPROVAL_REPOSITORY } from '@domain/approvals';
 
-// Health check
-import { HealthModule } from './health/health.module';
+// Points Domain
+import { PointsModule } from './domains/points';
+
+// Reservations Domain
+import { ReservationsModule } from './domains/reservations/reservations.module';
 
 @Module({
   imports: [
-    // Configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['.env.local', '.env'],
     }),
-
-    // Scheduling (for outbox worker)
-    ScheduleModule.forRoot(),
-
-    // Infrastructure
-    PrismaModule,
-
-    // Common modules
-    RequestContextModule,
-    ErrorsModule,
-    RetryModule,
-    IdempotencyModule,
-    EventingModule,
-    OutboxModule,
-
-    // Domain modules
-    ApprovalsModule,
-
-    // Health check
-    HealthModule,
+    CqrsModule,
+    PointsModule,
+    ReservationsModule,
   ],
+  controllers: [ApprovalsController],
   providers: [
+    // Infrastructure
+    PrismaService,
     {
-      provide: APP_FILTER,
-      useClass: AllExceptionsFilter,
+      provide: APPROVAL_REPOSITORY,
+      useClass: ApprovalRepository,
     },
+
+    // Application - Command Handlers
+    ...CommandHandlers,
+
+    // Application - Query Handlers
+    ...QueryHandlers,
   ],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(RequestContextMiddleware).forRoutes('*');
-  }
-}
+export class AppModule {}

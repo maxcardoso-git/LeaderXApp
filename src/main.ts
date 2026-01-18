@@ -21,8 +21,8 @@ async function bootstrap() {
 
   // Swagger setup
   const config = new DocumentBuilder()
-    .setTitle('Admin BFF API')
-    .setDescription('Admin BFF for LeaderX Platform')
+    .setTitle('LeaderX Core API')
+    .setDescription('Core API for LeaderX Platform - Decision Intelligence Engine')
     .setVersion('1.0')
     .addBearerAuth()
     .addApiKey({ type: 'apiKey', name: 'X-Tenant-Id', in: 'header' }, 'tenant-id')
@@ -32,10 +32,10 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3001;
   await app.listen(port);
 
-  logger.log(`Application is running on: http://localhost:${port}`);
+  logger.log(`Core API is running on: http://localhost:${port}`);
   logger.log(`Swagger documentation: http://localhost:${port}/api`);
 }
 

@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,70 +7,326 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================================================
-// INFRASTRUCTURE TABLES
-// ============================================================================
+// ============================================
+// APPROVALS
+// ============================================
 
-/// Idempotency records for ensuring exactly-once processing of mutations
+model Approval {
+  id              String    @id @default(uuid())
+  type            String
+  state           String    @default("PENDING")
+  candidateId     String    @map("candidate_id")
+  candidateName   String?   @map("candidate_name")
+  priority        String    @default("MEDIUM")
+  tenantId        String    @map("tenant_id")
+  orgId           String    @map("org_id")
+  cycleId         String?   @map("cycle_id")
+  metadata        Json?
+  decidedAt       DateTime? @map("decided_at")
+  decidedBy       String?   @map("decided_by")
+  decisionReason  String?   @map("decision_reason")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  @@index([tenantId, orgId])
+  @@index([tenantId, state])
+  @@index([tenantId, candidateId])
+  @@index([tenantId, cycleId])
+  @@index([createdAt])
+  @@map("approvals")
+}
+
+// ============================================
+// CANDIDATES (for Points calculation)
+// ============================================
+
+model Candidate {
+  id          String   @id @default(uuid())
+  name        String
+  email       String?
+  tenantId    String   @map("tenant_id")
+  orgId       String   @map("org_id")
+  score       Float    @default(0)
+  rank        Int?
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, email])
+  @@index([tenantId, orgId])
+  @@index([tenantId, score])
+  @@map("candidates")
+}
+
+// ============================================
+// AUDIT LOGS
+// ============================================
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  action        String
+  resourceType  String   @map("resource_type")
+  resourceId    String   @map("resource_id")
+  actorId       String   @map("actor_id")
+  tenantId      String   @map("tenant_id")
+  orgId         String   @map("org_id")
+  correlationId String?  @map("correlation_id")
+  metadata      Json?
+  timestamp     DateTime @default(now())
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, resourceType, resourceId])
+  @@index([tenantId, actorId])
+  @@index([tenantId, timestamp])
+  @@index([correlationId])
+  @@map("audit_logs")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id          String   @id @default(uuid())
+  recipientId String   @map("recipient_id")
+  channel     String   @default("PUSH")
+  templateId  String?  @map("template_id")
+  subject     String?
+  message     String
+  status      String   @default("PENDING")
+  tenantId    String   @map("tenant_id")
+  orgId       String   @map("org_id")
+  metadata    Json?
+  sentAt      DateTime? @map("sent_at")
+  failedAt    DateTime? @map("failed_at")
+  errorMessage String?  @map("error_message")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId, recipientId])
+  @@index([tenantId, status])
+  @@map("notifications")
+}
+
+// ============================================
+// NOTIFICATION TEMPLATES
+// ============================================
+
+model NotificationTemplate {
+  id        String   @id @default(uuid())
+  name      String
+  channel   String
+  subject   String?
+  body      String
+  variables String[]
+  tenantId  String   @map("tenant_id")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, name])
+  @@map("notification_templates")
+}
+
+// ============================================
+// POINTS DOMAIN - Ledger/Account System
+// ============================================
+
+/// Conta de pontos por tenant + owner (USER ou ORG)
+model PointAccount {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  ownerType String   @map("owner_type") // USER | ORG
+  ownerId   String   @map("owner_id")
+  status    String   @default("ACTIVE") // ACTIVE | SUSPENDED
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  ledgerEntries PointLedgerEntry[]
+  holds         PointHold[]
+
+  @@unique([tenantId, ownerType, ownerId])
+  @@index([tenantId])
+  @@index([ownerId])
+  @@map("point_accounts")
+}
+
+/// Ledger append-only. Cada linha representa um movimento de pontos.
+model PointLedgerEntry {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  accountId      String   @map("account_id")
+  entryType      String   @map("entry_type") // CREDIT | DEBIT | HOLD | RELEASE | COMMIT | REVERSAL
+  amount         Int      // sempre > 0
+  reasonCode     String   @map("reason_code")
+  referenceType  String   @map("reference_type") // RESERVATION | PURCHASE | APPROVAL | ADJUSTMENT | REFUND | SYSTEM
+  referenceId    String   @map("reference_id")
+  idempotencyKey String?  @map("idempotency_key")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  // Relations
+  account PointAccount @relation(fields: [accountId], references: [id])
+
+  @@index([tenantId, accountId, createdAt])
+  @@index([tenantId, referenceType, referenceId])
+  @@index([idempotencyKey])
+  @@map("point_ledger_entries")
+}
+
+/// Estado de holds (reservas) de pontos por referência
+model PointHold {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  accountId     String    @map("account_id")
+  referenceType String    @map("reference_type")
+  referenceId   String    @map("reference_id")
+  amount        Int
+  status        String    @default("ACTIVE") // ACTIVE | COMMITTED | RELEASED | EXPIRED
+  expiresAt     DateTime? @map("expires_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  account PointAccount @relation(fields: [accountId], references: [id])
+
+  @@unique([tenantId, accountId, referenceType, referenceId])
+  @@index([tenantId])
+  @@index([accountId])
+  @@index([status])
+  @@map("point_holds")
+}
+
+// ============================================
+// IDEMPOTENCY (Cross-domain)
+// ============================================
+
+/// Tabela reutilizável para idempotência de comandos
 model IdempotencyRecord {
-  id              String   @id @default(uuid())
-  scope           String   /// Operation scope (e.g., "approvals.decide", "approvals.bulkDecide")
-  idemKey         String   @map("idem_key") /// Idempotency-Key header value
-  tenantId        String   @map("tenant_id")
-  status          String   /// IN_PROGRESS | COMPLETED | FAILED
-  requestHash     String   @map("request_hash") /// SHA256 hash of request body
-  httpStatus      Int?     @map("http_status") /// HTTP status code of cached response
-  responsePayload Json?    @map("response_payload") /// Cached response body
-  errorPayload    Json?    @map("error_payload") /// Error details if failed
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  expiresAt       DateTime @map("expires_at")
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  scope           String    // ex: POINTS:HoldPoints, POINTS:CreditPoints
+  idemKey         String    @map("idem_key") // Idempotency-Key recebido
+  requestHash     String    @map("request_hash") // hash do payload
+  status          String    @default("IN_PROGRESS") // IN_PROGRESS | COMPLETED | FAILED
+  httpStatus      Int?      @map("http_status")
+  responsePayload Json?     @map("response_payload")
+  errorPayload    Json?     @map("error_payload")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  expiresAt       DateTime  @map("expires_at")
 
-  @@unique([scope, idemKey, tenantId], name: "ux_idem_scope_key_tenant")
-  @@index([expiresAt], name: "ix_idem_expires")
-  @@index([tenantId], name: "ix_idem_tenant")
+  @@unique([tenantId, scope, idemKey])
+  @@index([tenantId])
+  @@index([expiresAt])
   @@map("idempotency_records")
 }
 
-/// Outbox events for reliable event publishing (transactional outbox pattern)
+// ============================================
+// OUTBOX (Cross-domain event publishing)
+// ============================================
+
+/// Outbox pattern para publicação de eventos após commit
 model OutboxEvent {
   id            String    @id @default(uuid())
-  eventType     String    @map("event_type") /// Event type (e.g., "approval.decided")
-  aggregateType String    @map("aggregate_type") /// Aggregate type (e.g., "Approval")
-  aggregateId   String    @map("aggregate_id") /// Aggregate ID
-  correlationId String?   @map("correlation_id") /// Request correlation ID
-  payload       Json      /// Event payload
-  metadata      Json?     /// Additional metadata
-  status        String    @default("PENDING") /// PENDING | PROCESSING | PUBLISHED | DEAD
+  tenantId      String?   @map("tenant_id")
+  aggregateType String    @map("aggregate_type") // POINTS | APPROVALS | etc
+  aggregateId   String    @map("aggregate_id")
+  eventType     String    @map("event_type") // PointsHeld | PointsCredited | etc
+  correlationId String?   @map("correlation_id")
+  payload       Json
+  metadata      Json?
+  status        String    @default("PENDING") // PENDING | PROCESSING | PUBLISHED | DEAD
   retryCount    Int       @default(0) @map("retry_count")
-  maxRetries    Int       @default(5) @map("max_retries")
+  maxRetries    Int       @default(3) @map("max_retries")
   lastError     String?   @map("last_error")
   processedAt   DateTime? @map("processed_at")
   scheduledAt   DateTime  @default(now()) @map("scheduled_at")
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
-  @@index([status, scheduledAt], name: "ix_outbox_status_scheduled")
-  @@index([aggregateType, aggregateId], name: "ix_outbox_aggregate")
-  @@index([correlationId], name: "ix_outbox_correlation")
+  @@index([status, scheduledAt])
+  @@index([tenantId, aggregateType, aggregateId])
   @@map("outbox_events")
 }
 
-/// Job executions for tracking background jobs (optional)
-model JobExecution {
+// ============================================
+// RESERVATIONS DOMAIN
+// ============================================
+
+/// Reservation policy: rules for reservations by resource type
+model ReservationPolicy {
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  eventId          String    @map("event_id")
+  resourceType     String    @map("resource_type") // TABLE | SEAT | SLOT
+  costInPoints     Int       @default(0) @map("cost_in_points")
+  maxPerUser       Int       @default(1) @map("max_per_user")
+  requiresApproval Boolean   @default(false) @map("requires_approval")
+  holdTtlSeconds   Int       @default(900) @map("hold_ttl_seconds")
+  windowStart      DateTime? @map("window_start")
+  windowEnd        DateTime? @map("window_end")
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  reservations Reservation[]
+
+  @@index([tenantId, eventId, resourceType, isActive])
+  @@index([eventId])
+  @@map("reservation_policies")
+}
+
+/// Reservable resource (table, seat, slot) with capacity
+model ReservableResource {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  eventId       String   @map("event_id")
+  resourceType  String   @map("resource_type") // TABLE | SEAT | SLOT
+  name          String
+  capacityTotal Int      @default(1) @map("capacity_total")
+  metadata      Json?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  reservations Reservation[]
+
+  @@index([tenantId, eventId, resourceType])
+  @@index([tenantId, eventId, isActive])
+  @@map("reservable_resources")
+}
+
+/// Reservation aggregate root - lifecycle HOLD -> CONFIRMED or HOLD -> RELEASED/EXPIRED
+model Reservation {
   id           String    @id @default(uuid())
-  jobType      String    @map("job_type") /// Job type identifier
-  jobKey       String    @map("job_key") /// Unique job key for deduplication
-  status       String    @default("STARTED") /// STARTED | SUCCEEDED | FAILED
-  attempts     Int       @default(0)
-  lastError    String?   @map("last_error")
-  metadata     Json?     /// Additional job metadata
-  startedAt    DateTime  @default(now()) @map("started_at")
-  completedAt  DateTime? @map("completed_at")
+  tenantId     String    @map("tenant_id")
+  eventId      String    @map("event_id")
+  resourceId   String    @map("resource_id")
+  resourceType String    @map("resource_type") // TABLE | SEAT | SLOT
+  policyId     String    @map("policy_id")
+  ownerId      String    @map("owner_id")
+  ownerType    String    @map("owner_type") // MEMBER | LEADER | GUEST
+  status       String    @default("HOLD") // HOLD | CONFIRMED | RELEASED | EXPIRED | CANCELLED
+  pointsHoldId String?   @map("points_hold_id")
+  expiresAt    DateTime? @map("expires_at")
+  confirmedAt  DateTime? @map("confirmed_at")
+  releasedAt   DateTime? @map("released_at")
+  metadata     Json?
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  @@unique([jobType, jobKey], name: "ux_job_type_key")
-  @@index([status], name: "ix_job_status")
-  @@map("job_executions")
+  // Relations
+  resource ReservableResource @relation(fields: [resourceId], references: [id])
+  policy   ReservationPolicy  @relation(fields: [policyId], references: [id])
+
+  @@index([tenantId, eventId, ownerId, status])
+  @@index([tenantId, resourceId, status])
+  @@index([tenantId, eventId, resourceId, status])
+  @@index([status, expiresAt])
+  @@map("reservations")
 }
