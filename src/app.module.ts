@@ -31,6 +31,9 @@ import { GovernanceModule } from './domains/governance/governance.module';
 // Audit & Compliance Domain
 import { AuditModule } from './domains/audit/audit.module';
 
+// Network Domain
+import { NetworkModule } from './domains/network/network.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -43,6 +46,7 @@ import { AuditModule } from './domains/audit/audit.module';
     EventsModule,
     GovernanceModule,
     AuditModule,
+    NetworkModule,
   ],
   controllers: [ApprovalsController],
   providers: [

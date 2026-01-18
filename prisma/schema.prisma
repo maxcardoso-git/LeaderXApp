@@ -652,3 +652,54 @@ model ComplianceReport {
   @@index([generatedAt])
   @@map("compliance_reports")
 }
+
+// ============================================
+// NETWORK DOMAIN
+// ============================================
+
+/// NetworkNode - represents a node (member or entity) in the network hierarchy
+model NetworkNode {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  ownerId        String   @map("owner_id")
+  ownerType      String   @map("owner_type") // TENANT | COMMUNITY | EVENT | TABLE | NETWORK
+  userId         String?  @map("user_id")
+  role           String   @default("MEMBER") // OWNER | ADMIN | EMBAIXADOR | MEMBER | GUEST
+  status         String   @default("ACTIVE") // ACTIVE | INACTIVE | SUSPENDED
+  hierarchyLevel Int      @default(0) @map("hierarchy_level")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  parentRelations NetworkRelation[] @relation("ChildNode")
+  childRelations  NetworkRelation[] @relation("ParentNode")
+
+  @@unique([tenantId, ownerId, ownerType, userId])
+  @@index([tenantId])
+  @@index([tenantId, ownerId, ownerType])
+  @@index([tenantId, userId])
+  @@index([tenantId, status])
+  @@index([tenantId, role])
+  @@map("network_nodes")
+}
+
+/// NetworkRelation - represents parent-child relationships between nodes
+model NetworkRelation {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  parentNodeId String   @map("parent_node_id")
+  childNodeId  String   @map("child_node_id")
+  relationType String   @default("DIRECT") @map("relation_type") // DIRECT | INVITED | DELEGATED
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  // Relations
+  parentNode NetworkNode @relation("ParentNode", fields: [parentNodeId], references: [id], onDelete: Cascade)
+  childNode  NetworkNode @relation("ChildNode", fields: [childNodeId], references: [id], onDelete: Cascade)
+
+  @@unique([parentNodeId, childNodeId])
+  @@index([tenantId])
+  @@index([tenantId, parentNodeId])
+  @@index([tenantId, childNodeId])
+  @@map("network_relations")
+}
