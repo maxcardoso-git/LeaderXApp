@@ -24,10 +24,13 @@ import {
   UpdateUserUseCase,
   DeactivateUserUseCase,
   ListUsersUseCase,
+  GetUserUseCase,
   CreatePermissionUseCase,
   ListPermissionsUseCase,
   CreateRoleUseCase,
   ListRolesUseCase,
+  GetRoleUseCase,
+  UpdateRoleUseCase,
   UpsertRolePermissionsUseCase,
   AssignRoleUseCase,
   RevokeRoleUseCase,
@@ -72,10 +75,13 @@ export class IdentityController {
     private readonly updateUserUseCase: UpdateUserUseCase,
     private readonly deactivateUserUseCase: DeactivateUserUseCase,
     private readonly listUsersUseCase: ListUsersUseCase,
+    private readonly getUserUseCase: GetUserUseCase,
     private readonly createPermissionUseCase: CreatePermissionUseCase,
     private readonly listPermissionsUseCase: ListPermissionsUseCase,
     private readonly createRoleUseCase: CreateRoleUseCase,
     private readonly listRolesUseCase: ListRolesUseCase,
+    private readonly getRoleUseCase: GetRoleUseCase,
+    private readonly updateRoleUseCase: UpdateRoleUseCase,
     private readonly upsertRolePermissionsUseCase: UpsertRolePermissionsUseCase,
     private readonly assignRoleUseCase: AssignRoleUseCase,
     private readonly revokeRoleUseCase: RevokeRoleUseCase,
@@ -127,6 +133,23 @@ export class IdentityController {
       page: dto.page ?? 1,
       size: dto.size ?? 25,
     });
+  }
+
+  @Get('users/:userId')
+  @ApiOperation({ summary: 'Get a user by ID' })
+  @ApiResponse({ status: 200, description: 'User retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiHeader({ name: 'X-Tenant-Id', required: true })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  async getUser(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('userId') userId: string,
+  ) {
+    try {
+      return await this.getUserUseCase.execute({ tenantId, userId });
+    } catch (error) {
+      this.handleError(error);
+    }
   }
 
   @Put('users/:userId')
@@ -257,6 +280,51 @@ export class IdentityController {
       page: dto.page ?? 1,
       size: dto.size ?? 25,
     });
+  }
+
+  @Get('roles/:roleId')
+  @ApiOperation({ summary: 'Get a role by ID' })
+  @ApiResponse({ status: 200, description: 'Role retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @ApiHeader({ name: 'X-Tenant-Id', required: true })
+  @ApiParam({ name: 'roleId', description: 'Role ID' })
+  async getRole(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('roleId') roleId: string,
+    @Query('includePermissions') includePermissions?: string,
+  ) {
+    try {
+      return await this.getRoleUseCase.execute({
+        tenantId,
+        roleId,
+        includePermissions: includePermissions === 'true',
+      });
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Put('roles/:roleId')
+  @ApiOperation({ summary: 'Update a role' })
+  @ApiResponse({ status: 200, description: 'Role updated successfully' })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @ApiHeader({ name: 'X-Tenant-Id', required: true })
+  @ApiParam({ name: 'roleId', description: 'Role ID' })
+  async updateRole(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('roleId') roleId: string,
+    @Body() dto: { name?: string; description?: string },
+  ) {
+    try {
+      return await this.updateRoleUseCase.execute({
+        tenantId,
+        roleId,
+        name: dto.name,
+        description: dto.description,
+      });
+    } catch (error) {
+      this.handleError(error);
+    }
   }
 
   @Put('roles/:roleId/permissions')
