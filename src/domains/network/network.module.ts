@@ -2,7 +2,12 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../infrastructure/prisma/prisma.module';
 
 // Controllers
-import { NetworkController } from './inbound/controllers';
+import {
+  NetworkController,
+  StructureTypesController,
+  StructuresController,
+  NetworkStatsController,
+} from './inbound/controllers';
 
 // Use Cases
 import {
@@ -40,7 +45,7 @@ import {
 
 @Module({
   imports: [PrismaModule],
-  controllers: [NetworkController],
+  controllers: [NetworkController, StructureTypesController, StructuresController, NetworkStatsController],
   providers: [
     // Use Cases
     CreateNetworkNodeUseCase,

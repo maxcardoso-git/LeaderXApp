@@ -703,3 +703,376 @@ model NetworkRelation {
   @@index([tenantId, childNodeId])
   @@map("network_relations")
 }
+
+/// StructureType - defines types of organizational structures
+model StructureType {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  code        String   // COMMUNITY | EVENT | TABLE | NETWORK | TEAM | DEPARTMENT
+  name        String
+  description String?
+  icon        String?
+  color       String?
+  maxLevels   Int      @default(5) @map("max_levels")
+  allowNested Boolean  @default(true) @map("allow_nested")
+  metadata    Json?
+  status      String   @default("ACTIVE") // ACTIVE | INACTIVE
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  structures Structure[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("structure_types")
+}
+
+/// Structure - represents an organizational unit (community, event, table, etc.)
+model Structure {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  typeId          String   @map("type_id")
+  parentId        String?  @map("parent_id")
+  code            String
+  name            String
+  description     String?
+  status          String   @default("ACTIVE") // ACTIVE | INACTIVE | ARCHIVED
+  level           Int      @default(0)
+  path            String?  // Materialized path for hierarchy (e.g., "/root/parent/child")
+  metadata        Json?
+  settings        Json?    // Structure-specific settings
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  type            StructureType     @relation(fields: [typeId], references: [id])
+  parent          Structure?        @relation("StructureHierarchy", fields: [parentId], references: [id])
+  children        Structure[]       @relation("StructureHierarchy")
+  leaders         StructureLeader[]
+  approvalChain   ApprovalChainStep[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, typeId])
+  @@index([tenantId, parentId])
+  @@index([tenantId, status])
+  @@index([path])
+  @@map("structures")
+}
+
+/// StructureLeader - assigns leadership roles to users within structures
+model StructureLeader {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  structureId String    @map("structure_id")
+  userId      String    @map("user_id")
+  role        String    // OWNER | COORDINATOR | LEADER | DELEGATE
+  isPrimary   Boolean   @default(false) @map("is_primary")
+  canApprove  Boolean   @default(true) @map("can_approve")
+  maxAmount   Decimal?  @map("max_amount") @db.Decimal(15, 2) // Approval limit
+  startDate   DateTime  @default(now()) @map("start_date")
+  endDate     DateTime? @map("end_date")
+  status      String    @default("ACTIVE") // ACTIVE | INACTIVE | EXPIRED
+  metadata    Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  structure Structure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, structureId, userId, role])
+  @@index([tenantId])
+  @@index([tenantId, structureId])
+  @@index([tenantId, userId])
+  @@index([tenantId, status])
+  @@map("structure_leaders")
+}
+
+/// ApprovalChainStep - defines approval chain steps for a structure
+model ApprovalChainStep {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  structureId String   @map("structure_id")
+  stepOrder   Int      @map("step_order")
+  roleRequired String  @map("role_required") // Role required to approve at this step
+  minApprovers Int     @default(1) @map("min_approvers")
+  maxAmount   Decimal? @map("max_amount") @db.Decimal(15, 2) // Amount threshold for this step
+  isOptional  Boolean  @default(false) @map("is_optional")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  structure Structure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, structureId, stepOrder])
+  @@index([tenantId])
+  @@index([tenantId, structureId])
+  @@map("approval_chain_steps")
+}
+
+// ============================================
+// SETTINGS DOMAIN
+// ============================================
+
+/// TenantSettings - stores tenant-specific settings like themes
+model TenantSettings {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  key       String
+  value     Json
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@map("tenant_settings")
+}
+
+// ============================================
+// TAXONOMY DOMAIN
+// ============================================
+
+/// Category - product/service categories for taxonomy
+model Category {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  code        String
+  name        String
+  description String?
+  parentId    String?  @map("parent_id")
+  level       Int      @default(0)
+  path        String?
+  icon        String?
+  color       String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  status      String   @default("ACTIVE")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryHierarchy")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, parentId])
+  @@index([tenantId, status])
+  @@map("categories")
+}
+
+/// Segment - market/business segments
+model Segment {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  code        String
+  name        String
+  description String?
+  icon        String?
+  color       String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  status      String   @default("ACTIVE")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("segments")
+}
+
+/// Line - product/service lines
+model Line {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  code        String
+  name        String
+  description String?
+  segmentId   String?  @map("segment_id")
+  icon        String?
+  color       String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  status      String   @default("ACTIVE")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, segmentId])
+  @@index([tenantId, status])
+  @@map("lines")
+}
+
+/// Position - organizational positions (cargos)
+model Position {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  code           String
+  name           String
+  description    String?
+  hierarchyGroup String   @map("hierarchy_group")
+  level          Int      @default(0)
+  canApprove     Boolean  @default(false) @map("can_approve")
+  approvalLimit  Decimal? @map("approval_limit") @db.Decimal(15, 2)
+  icon           String?
+  color          String?
+  sortOrder      Int      @default(0) @map("sort_order")
+  status         String   @default("ACTIVE")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, hierarchyGroup])
+  @@index([tenantId, status])
+  @@map("positions")
+}
+
+/// HierarchyGroup - groups of positions for organization
+model HierarchyGroup {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  code        String
+  name        String
+  description String?
+  level       Int      @default(0)
+  icon        String?
+  color       String?
+  sortOrder   Int      @default(0) @map("sort_order")
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("hierarchy_groups")
+}
+
+/// Cycle - business/workflow cycles
+model Cycle {
+  id          String    @id @default(uuid())
+  tenantId    String    @map("tenant_id")
+  code        String
+  name        String
+  description String?
+  startDate   DateTime  @map("start_date")
+  endDate     DateTime  @map("end_date")
+  isCurrent   Boolean   @default(false) @map("is_current")
+  status      String    @default("PLANNED")
+  metadata    Json?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, isCurrent])
+  @@map("cycles")
+}
+
+/// Supplier - external suppliers/vendors
+model Supplier {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  code          String
+  name          String
+  tradeName     String?  @map("trade_name")
+  document      String?
+  documentType  String?  @map("document_type")
+  email         String?
+  phone         String?
+  website       String?
+  street        String?
+  number        String?
+  complement    String?
+  neighborhood  String?
+  city          String?
+  state         String?
+  zipCode       String?  @map("zip_code")
+  country       String?  @default("BR")
+  categoryId    String?  @map("category_id")
+  segmentId     String?  @map("segment_id")
+  status        String   @default("ACTIVE")
+  rating        Int?
+  notes         String?
+  metadata      Json?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, segmentId])
+  @@map("suppliers")
+}
+
+// ============================================
+// GOVERNANCE DOMAIN - Working Units
+// ============================================
+
+/// WorkingUnit - Groups and Nuclei for social organization
+model WorkingUnit {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  structureId   String?   @map("structure_id") // Links to Network Structure
+  parentId      String?   @map("parent_id")
+  code          String
+  name          String
+  description   String?
+  type          String    // GROUP | NUCLEUS | TEAM | COMMITTEE
+  level         Int       @default(0)
+  path          String?
+  maxMembers    Int?      @map("max_members")
+  status        String    @default("ACTIVE") // ACTIVE | INACTIVE | ARCHIVED
+  metadata      Json?
+  settings      Json?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Self-referential relation
+  parent        WorkingUnit?  @relation("WorkingUnitHierarchy", fields: [parentId], references: [id])
+  children      WorkingUnit[] @relation("WorkingUnitHierarchy")
+  memberships   WorkingUnitMembership[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, structureId])
+  @@index([tenantId, parentId])
+  @@index([tenantId, type])
+  @@index([tenantId, status])
+  @@map("working_units")
+}
+
+/// WorkingUnitMembership - Members of working units
+model WorkingUnitMembership {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  workingUnitId   String    @map("working_unit_id")
+  userId          String    @map("user_id")
+  positionId      String?   @map("position_id") // Links to Position (cargo)
+  role            String    // COORDINATOR | LEADER | MEMBER | GUEST
+  isLeader        Boolean   @default(false) @map("is_leader")
+  canApprove      Boolean   @default(false) @map("can_approve")
+  joinedAt        DateTime  @default(now()) @map("joined_at")
+  leftAt          DateTime? @map("left_at")
+  status          String    @default("ACTIVE") // ACTIVE | INACTIVE | REMOVED
+  metadata        Json?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  workingUnit     WorkingUnit @relation(fields: [workingUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, workingUnitId, userId])
+  @@index([tenantId])
+  @@index([tenantId, workingUnitId])
+  @@index([tenantId, userId])
+  @@index([tenantId, positionId])
+  @@index([tenantId, status])
+  @@map("working_unit_memberships")
+}

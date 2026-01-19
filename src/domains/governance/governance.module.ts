@@ -28,8 +28,14 @@ import {
   ListAuditLogsUseCase,
 } from './application/usecases';
 
-// Controller
-import { GovernanceController } from './inbound/controllers';
+// Controllers
+import {
+  GovernanceController,
+  WorkingUnitsController,
+  PositionsController,
+  HierarchyGroupsController,
+  GovernanceStatsController,
+} from './inbound/controllers';
 
 const repositories = [
   { provide: GOVERNANCE_POLICY_REPOSITORY, useClass: GovernancePolicyRepository },
@@ -49,7 +55,13 @@ const useCases = [
 ];
 
 @Module({
-  controllers: [GovernanceController],
+  controllers: [
+    GovernanceController,
+    WorkingUnitsController,
+    PositionsController,
+    HierarchyGroupsController,
+    GovernanceStatsController,
+  ],
   providers: [
     PrismaService,
     PolicyEnforcerService,

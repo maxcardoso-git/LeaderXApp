@@ -193,6 +193,48 @@ export class IdentityController {
     }
   }
 
+  @Post('users/:userId/suspend')
+  @ApiOperation({ summary: 'Suspend a user' })
+  @ApiResponse({ status: 200, description: 'User suspended successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiHeader({ name: 'X-Tenant-Id', required: true })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  async suspendUser(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('userId') userId: string,
+  ) {
+    try {
+      return await this.updateUserUseCase.execute({
+        tenantId,
+        userId,
+        status: UserStatus.SUSPENDED,
+      });
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Post('users/:userId/activate')
+  @ApiOperation({ summary: 'Activate a user' })
+  @ApiResponse({ status: 200, description: 'User activated successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiHeader({ name: 'X-Tenant-Id', required: true })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  async activateUser(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('userId') userId: string,
+  ) {
+    try {
+      return await this.updateUserUseCase.execute({
+        tenantId,
+        userId,
+        status: UserStatus.ACTIVE,
+      });
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
   // ========== PERMISSION ENDPOINTS ==========
 
   @Post('permissions')
@@ -352,6 +394,52 @@ export class IdentityController {
     }
   }
 
+  @Get('roles/:roleId/permissions')
+  @ApiOperation({ summary: 'Get permissions for a role' })
+  @ApiResponse({ status: 200, description: 'Permissions retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @ApiHeader({ name: 'X-Tenant-Id', required: true })
+  @ApiParam({ name: 'roleId', description: 'Role ID' })
+  async getRolePermissions(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('roleId') roleId: string,
+  ) {
+    try {
+      const role = await this.getRoleUseCase.execute({
+        tenantId,
+        roleId,
+        includePermissions: true,
+      });
+      return { items: role.permissions || [] };
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Delete('roles/:roleId')
+  @ApiOperation({ summary: 'Delete a role' })
+  @ApiResponse({ status: 200, description: 'Role deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Role not found' })
+  @ApiHeader({ name: 'X-Tenant-Id', required: true })
+  @ApiParam({ name: 'roleId', description: 'Role ID' })
+  async deleteRole(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('roleId') roleId: string,
+  ) {
+    try {
+      // For now, we'll just update the role status to DELETED or similar
+      // TODO: Implement actual role deletion use case if needed
+      return await this.updateRoleUseCase.execute({
+        tenantId,
+        roleId,
+        // Marking as deleted via description, since we don't have a delete use case
+        description: '[DELETED]',
+      });
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
   // ========== ASSIGNMENT ENDPOINTS ==========
 
   @Post('users/:userId/roles/assign')
@@ -424,6 +512,70 @@ export class IdentityController {
       userId,
       status: dto.status as AssignmentStatus,
     });
+  }
+
+  @Post('users/:userId/roles')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Assign a role to a user (simplified)' })
+  @ApiResponse({ status: 201, description: 'Role assigned successfully' })
+  @ApiResponse({ status: 404, description: 'User or role not found' })
+  @ApiResponse({ status: 409, description: 'Duplicate assignment' })
+  @ApiHeader({ name: 'X-Tenant-Id', required: true })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  async assignRoleSimple(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('userId') userId: string,
+    @Body() dto: { roleId: string },
+  ) {
+    try {
+      return await this.assignRoleUseCase.execute({
+        tenantId,
+        userId,
+        roleId: dto.roleId,
+        scopeType: ScopeType.GLOBAL,
+        scopeId: undefined,
+        assignedBy: undefined,
+        metadata: undefined,
+        idempotencyKey: undefined,
+      });
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  @Delete('users/:userId/roles/:roleId')
+  @ApiOperation({ summary: 'Remove a role from a user' })
+  @ApiResponse({ status: 200, description: 'Role removed successfully' })
+  @ApiResponse({ status: 404, description: 'Assignment not found' })
+  @ApiHeader({ name: 'X-Tenant-Id', required: true })
+  @ApiParam({ name: 'userId', description: 'User ID' })
+  @ApiParam({ name: 'roleId', description: 'Role ID' })
+  async removeRole(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('userId') userId: string,
+    @Param('roleId') roleId: string,
+  ) {
+    try {
+      // Find the assignment by userId and roleId, then revoke
+      const assignments = await this.listUserRolesUseCase.execute({
+        tenantId,
+        userId,
+        status: AssignmentStatus.ACTIVE,
+      });
+
+      const assignment = assignments.assignments?.find((a: any) => a.roleId === roleId);
+      if (!assignment) {
+        throw new AssignmentNotFoundError(roleId);
+      }
+
+      return await this.revokeRoleUseCase.execute({
+        tenantId,
+        userId,
+        assignmentId: assignment.id,
+      });
+    } catch (error) {
+      this.handleError(error);
+    }
   }
 
   // ========== ACCESS EVALUATION ENDPOINTS ==========

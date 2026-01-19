@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsArray, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray, IsNumber, IsBoolean } from 'class-validator';
+import { Type } from 'class-transformer';
 import { NodeRole, NodeStatus, OwnerType, RelationType } from '../../domain/value-objects';
 
 // ============================================
@@ -208,4 +209,465 @@ export class ValidateAuthorityResponseDto {
 
   @ApiProperty()
   validatedAt: string;
+}
+
+// ============================================
+// STRUCTURE TYPE DTOs
+// ============================================
+
+export class CreateStructureTypeDto {
+  @ApiProperty({ description: 'Unique code for the structure type' })
+  @IsString()
+  code: string;
+
+  @ApiProperty({ description: 'Display name' })
+  @IsString()
+  name: string;
+
+  @ApiPropertyOptional({ description: 'Description of the structure type' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'Icon identifier' })
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @ApiPropertyOptional({ description: 'Color code (hex)' })
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @ApiPropertyOptional({ description: 'Maximum hierarchy levels', default: 5 })
+  @IsOptional()
+  @IsNumber()
+  maxLevels?: number;
+
+  @ApiPropertyOptional({ description: 'Allow nested structures', default: true })
+  @IsOptional()
+  allowNested?: boolean;
+
+  @ApiPropertyOptional({ description: 'Additional metadata' })
+  @IsOptional()
+  metadata?: Record<string, unknown>;
+}
+
+export class UpdateStructureTypeDto {
+  @ApiPropertyOptional({ description: 'Display name' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'Description' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'Icon identifier' })
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @ApiPropertyOptional({ description: 'Color code (hex)' })
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @ApiPropertyOptional({ description: 'Maximum hierarchy levels' })
+  @IsOptional()
+  @IsNumber()
+  maxLevels?: number;
+
+  @ApiPropertyOptional({ description: 'Allow nested structures' })
+  @IsOptional()
+  allowNested?: boolean;
+
+  @ApiPropertyOptional({ description: 'Additional metadata' })
+  @IsOptional()
+  metadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ enum: ['ACTIVE', 'INACTIVE'], description: 'Status' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+}
+
+export class ListStructureTypesQueryDto {
+  @ApiPropertyOptional({ description: 'Search by name or code' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ enum: ['ACTIVE', 'INACTIVE'], description: 'Filter by status' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @IsNumber()
+  page?: number;
+
+  @ApiPropertyOptional({ default: 25 })
+  @IsOptional()
+  @IsNumber()
+  size?: number;
+}
+
+export class StructureTypeResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  tenantId: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiPropertyOptional()
+  description?: string;
+
+  @ApiPropertyOptional()
+  icon?: string;
+
+  @ApiPropertyOptional()
+  color?: string;
+
+  @ApiProperty()
+  maxLevels: number;
+
+  @ApiProperty()
+  allowNested: boolean;
+
+  @ApiPropertyOptional()
+  metadata?: Record<string, unknown>;
+
+  @ApiProperty()
+  status: string;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+}
+
+// ============================================
+// STRUCTURE DTOs
+// ============================================
+
+export class CreateStructureDto {
+  @ApiProperty({ description: 'Structure type ID' })
+  @IsString()
+  typeId: string;
+
+  @ApiPropertyOptional({ description: 'Parent structure ID' })
+  @IsOptional()
+  @IsString()
+  parentId?: string;
+
+  @ApiProperty({ description: 'Unique code for the structure' })
+  @IsString()
+  code: string;
+
+  @ApiProperty({ description: 'Display name' })
+  @IsString()
+  name: string;
+
+  @ApiPropertyOptional({ description: 'Description' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'Additional metadata' })
+  @IsOptional()
+  metadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Structure-specific settings' })
+  @IsOptional()
+  settings?: Record<string, unknown>;
+}
+
+export class UpdateStructureDto {
+  @ApiPropertyOptional({ description: 'Display name' })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'Description' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'Parent structure ID' })
+  @IsOptional()
+  @IsString()
+  parentId?: string;
+
+  @ApiPropertyOptional({ description: 'Additional metadata' })
+  @IsOptional()
+  metadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Structure-specific settings' })
+  @IsOptional()
+  settings?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ enum: ['ACTIVE', 'INACTIVE', 'ARCHIVED'], description: 'Status' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+}
+
+export class ListStructuresQueryDto {
+  @ApiPropertyOptional({ description: 'Filter by type ID' })
+  @IsOptional()
+  @IsString()
+  typeId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by parent ID' })
+  @IsOptional()
+  @IsString()
+  parentId?: string;
+
+  @ApiPropertyOptional({ enum: ['ACTIVE', 'INACTIVE', 'ARCHIVED'], description: 'Filter by status' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ description: 'Search by name or code' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @IsNumber()
+  page?: number;
+
+  @ApiPropertyOptional({ default: 25 })
+  @IsOptional()
+  @IsNumber()
+  size?: number;
+}
+
+export class StructureResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  tenantId: string;
+
+  @ApiProperty()
+  typeId: string;
+
+  @ApiPropertyOptional()
+  parentId?: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiPropertyOptional()
+  description?: string;
+
+  @ApiProperty()
+  status: string;
+
+  @ApiProperty()
+  level: number;
+
+  @ApiPropertyOptional()
+  path?: string;
+
+  @ApiPropertyOptional()
+  metadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional()
+  settings?: Record<string, unknown>;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+
+  // Relationships loaded optionally
+  @ApiPropertyOptional()
+  type?: StructureTypeResponseDto;
+
+  @ApiPropertyOptional()
+  parent?: StructureResponseDto;
+
+  @ApiPropertyOptional()
+  leaders?: any[];
+}
+
+// ============================================
+// STRUCTURE LEADER DTOs
+// ============================================
+
+export class AssignLeaderDto {
+  @ApiProperty({ description: 'User ID to assign as leader' })
+  @IsString()
+  userId: string;
+
+  @ApiProperty({ enum: ['OWNER', 'COORDINATOR', 'LEADER', 'DELEGATE'], description: 'Leadership role' })
+  @IsString()
+  role: string;
+
+  @ApiPropertyOptional({ description: 'Is primary leader', default: false })
+  @IsOptional()
+  isPrimary?: boolean;
+
+  @ApiPropertyOptional({ description: 'Can approve requests', default: true })
+  @IsOptional()
+  canApprove?: boolean;
+
+  @ApiPropertyOptional({ description: 'Maximum approval amount' })
+  @IsOptional()
+  @IsNumber()
+  maxAmount?: number;
+
+  @ApiPropertyOptional({ description: 'Start date' })
+  @IsOptional()
+  startDate?: string;
+
+  @ApiPropertyOptional({ description: 'End date' })
+  @IsOptional()
+  endDate?: string;
+
+  @ApiPropertyOptional({ description: 'Additional metadata' })
+  @IsOptional()
+  metadata?: Record<string, unknown>;
+}
+
+export class UpdateLeaderDto {
+  @ApiPropertyOptional({ enum: ['OWNER', 'COORDINATOR', 'LEADER', 'DELEGATE'], description: 'Leadership role' })
+  @IsOptional()
+  @IsString()
+  role?: string;
+
+  @ApiPropertyOptional({ description: 'Is primary leader' })
+  @IsOptional()
+  isPrimary?: boolean;
+
+  @ApiPropertyOptional({ description: 'Can approve requests' })
+  @IsOptional()
+  canApprove?: boolean;
+
+  @ApiPropertyOptional({ description: 'Maximum approval amount' })
+  @IsOptional()
+  @IsNumber()
+  maxAmount?: number;
+
+  @ApiPropertyOptional({ description: 'End date' })
+  @IsOptional()
+  endDate?: string;
+
+  @ApiPropertyOptional({ enum: ['ACTIVE', 'INACTIVE', 'EXPIRED'], description: 'Status' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ description: 'Additional metadata' })
+  @IsOptional()
+  metadata?: Record<string, unknown>;
+}
+
+export class StructureLeaderResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  tenantId: string;
+
+  @ApiProperty()
+  structureId: string;
+
+  @ApiProperty()
+  userId: string;
+
+  @ApiProperty()
+  role: string;
+
+  @ApiProperty()
+  isPrimary: boolean;
+
+  @ApiProperty()
+  canApprove: boolean;
+
+  @ApiPropertyOptional()
+  maxAmount?: number;
+
+  @ApiProperty()
+  startDate: string;
+
+  @ApiPropertyOptional()
+  endDate?: string;
+
+  @ApiProperty()
+  status: string;
+
+  @ApiPropertyOptional()
+  metadata?: Record<string, unknown>;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiProperty()
+  updatedAt: string;
+}
+
+// ============================================
+// STRUCTURE TREE DTOs
+// ============================================
+
+export class StructureTreeNodeDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  code: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  typeId: string;
+
+  @ApiPropertyOptional()
+  typeName?: string;
+
+  @ApiProperty()
+  level: number;
+
+  @ApiProperty()
+  status: string;
+
+  @ApiPropertyOptional({ type: [StructureTreeNodeDto] })
+  children?: StructureTreeNodeDto[];
+}
+
+// ============================================
+// PAGINATED RESPONSE
+// ============================================
+
+export class PaginatedResponseDto<T> {
+  @ApiProperty()
+  items: T[];
+
+  @ApiProperty()
+  page: number;
+
+  @ApiProperty()
+  size: number;
+
+  @ApiProperty()
+  total: number;
 }

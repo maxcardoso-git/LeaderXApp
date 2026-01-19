@@ -34,6 +34,9 @@ import { AuditModule } from './domains/audit/audit.module';
 // Network Domain
 import { NetworkModule } from './domains/network/network.module';
 
+// Settings Domain
+import { SettingsModule } from './domains/settings';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -47,6 +50,7 @@ import { NetworkModule } from './domains/network/network.module';
     GovernanceModule,
     AuditModule,
     NetworkModule,
+    SettingsModule,
   ],
   controllers: [ApprovalsController],
   providers: [
