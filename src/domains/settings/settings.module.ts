@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/persistence/prisma.service';
 import { SettingsController } from './settings.controller';
-import { CategoriesController, SegmentsController, LinesController } from './taxonomy.controller';
+import { CategoriesController, SegmentsController, LinesController, PositionsController, HierarchyGroupsController } from './taxonomy.controller';
 import { CyclesController } from './workflow.controller';
 import { SuppliersController, IntegrationsController } from './suppliers.controller';
 
@@ -12,6 +12,8 @@ import { SuppliersController, IntegrationsController } from './suppliers.control
     CategoriesController,
     SegmentsController,
     LinesController,
+    PositionsController,
+    HierarchyGroupsController,
     // Workflow
     CyclesController,
     // Suppliers
