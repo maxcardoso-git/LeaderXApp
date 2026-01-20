@@ -159,7 +159,6 @@ async function main() {
       name: 'Administrador',
       description: 'Acesso total ao sistema',
       effect: 'ALLOW',
-      isSystem: true,
     },
   });
 
@@ -172,7 +171,6 @@ async function main() {
       name: 'Gerente',
       description: 'Gerencia usuários e equipes',
       effect: 'ALLOW',
-      isSystem: false,
     },
   });
 
@@ -185,7 +183,6 @@ async function main() {
       name: 'Visualizador',
       description: 'Apenas visualização',
       effect: 'ALLOW',
-      isSystem: false,
     },
   });
 
