@@ -8,12 +8,8 @@ export interface GetRoleQuery {
   includePermissions?: boolean;
 }
 
-export interface PermissionItem {
+export interface RolePermissionItem {
   id: string;
-  code: string;
-  name: string;
-  description?: string;
-  category?: string;
   effect: string;
 }
 
@@ -24,7 +20,7 @@ export interface GetRoleResult {
   name: string;
   description?: string;
   effect: string;
-  permissions: PermissionItem[];
+  permissions: RolePermissionItem[];
   createdAt: string;
   updatedAt: string;
 }
@@ -53,11 +49,7 @@ export class GetRoleUseCase {
       description: role.description,
       effect: role.effect,
       permissions: (role.permissions || []).map((rp) => ({
-        id: rp.permission?.id || rp.permissionId,
-        code: rp.permission?.code || '',
-        name: rp.permission?.name || '',
-        description: rp.permission?.description,
-        category: rp.permission?.category,
+        id: rp.permissionId,
         effect: rp.effect,
       })),
       createdAt: role.createdAt.toISOString(),

@@ -101,8 +101,16 @@ export class Role {
     return this._name;
   }
 
+  set name(value: string) {
+    this._name = value;
+  }
+
   get description(): string | undefined {
     return this._description;
+  }
+
+  set description(value: string | undefined) {
+    this._description = value;
   }
 
   get effect(): RoleEffect {
@@ -115,6 +123,10 @@ export class Role {
 
   get updatedAt(): Date {
     return this._updatedAt;
+  }
+
+  set updatedAt(value: Date) {
+    this._updatedAt = value;
   }
 
   get permissions(): readonly RolePermission[] {
