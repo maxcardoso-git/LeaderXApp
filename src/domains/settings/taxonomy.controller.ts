@@ -387,3 +387,119 @@ export class LinesController {
   }
 }
 
+// ============================================
+// CLASSIFICATIONS CONTROLLER
+// ============================================
+
+@ApiTags('Taxonomy - Classifications')
+@Controller('taxonomy/classifications')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class ClassificationsController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new classification' })
+  async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    const existing = await this.prisma.classification.findUnique({
+      where: { tenantId_categoryId_name: { tenantId, categoryId: dto.categoryId, name: dto.name } },
+    });
+
+    if (existing) {
+      throw new HttpException({ error: 'CLASSIFICATION_EXISTS' }, HttpStatus.CONFLICT);
+    }
+
+    // Verify category exists
+    const category = await this.prisma.category.findFirst({
+      where: { id: dto.categoryId, tenantId },
+    });
+
+    if (!category) {
+      throw new HttpException({ error: 'CATEGORY_NOT_FOUND' }, HttpStatus.BAD_REQUEST);
+    }
+
+    return this.prisma.classification.create({
+      data: {
+        tenantId,
+        categoryId: dto.categoryId,
+        name: dto.name,
+        description: dto.description,
+        badgeColor: dto.badgeColor ?? '#c4a45a',
+        displayOrder: dto.displayOrder ?? 0,
+        metadata: dto.metadata ?? {},
+      },
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List classifications' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 100,
+    @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * size;
+    const where: any = { tenantId };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (categoryId) where.categoryId = categoryId;
+
+    const [items, total] = await Promise.all([
+      this.prisma.classification.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }]
+      }),
+      this.prisma.classification.count({ where }),
+    ]);
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get classification by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const classification = await this.prisma.classification.findFirst({ where: { id, tenantId } });
+    if (!classification) throw new HttpException({ error: 'CLASSIFICATION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    return classification;
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update classification' })
+  async update(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    const existing = await this.prisma.classification.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'CLASSIFICATION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    return this.prisma.classification.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        description: dto.description ?? existing.description,
+        categoryId: dto.categoryId ?? existing.categoryId,
+        badgeColor: dto.badgeColor ?? existing.badgeColor,
+        displayOrder: dto.displayOrder ?? existing.displayOrder,
+        status: dto.status ?? existing.status,
+        metadata: dto.metadata ?? existing.metadata,
+      },
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete classification' })
+  async delete(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const existing = await this.prisma.classification.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'CLASSIFICATION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    await this.prisma.classification.delete({ where: { id } });
+    return existing;
+  }
+}
+

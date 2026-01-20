@@ -905,6 +905,27 @@ model Line {
   @@map("lines")
 }
 
+/// Classification - classifications within categories
+model Classification {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  categoryId   String   @map("category_id")
+  name         String
+  description  String?
+  badgeColor   String   @default("#c4a45a") @map("badge_color")
+  displayOrder Int      @default(0) @map("display_order")
+  status       String   @default("ACTIVE")
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, categoryId, name])
+  @@index([tenantId])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, status])
+  @@map("classifications")
+}
+
 /// Position - organizational positions (cargos)
 model Position {
   id             String   @id @default(uuid())
