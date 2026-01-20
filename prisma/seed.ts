@@ -408,6 +408,76 @@ async function main() {
 
   console.log(`Created ${positionCount} positions`);
 
+  // Create Working Units (Groups)
+  const workingUnitsData = [
+    { code: 'GRUPO_COMUNICACAO', name: 'Grupo de Comunicação', description: 'Responsável pela comunicação interna e externa', type: 'GROUP', maxMembers: 15 },
+    { code: 'GRUPO_FORMACAO', name: 'Grupo de Formação', description: 'Formação e capacitação de membros', type: 'GROUP', maxMembers: 10 },
+    { code: 'GRUPO_EVENTOS', name: 'Grupo de Eventos', description: 'Organização de eventos e atividades', type: 'GROUP', maxMembers: 12 },
+    { code: 'GRUPO_FINANCEIRO', name: 'Grupo Financeiro', description: 'Gestão financeira e orçamentária', type: 'GROUP', maxMembers: 8 },
+    { code: 'GRUPO_PROJETOS', name: 'Grupo de Projetos', description: 'Gestão de projetos especiais', type: 'GROUP', maxMembers: 20 },
+  ];
+
+  const workingUnits = await Promise.all(
+    workingUnitsData.map((unit) =>
+      prisma.workingUnit.upsert({
+        where: { tenantId_code: { tenantId: TENANT_ID, code: unit.code } },
+        update: {},
+        create: {
+          tenantId: TENANT_ID,
+          code: unit.code,
+          name: unit.name,
+          description: unit.description,
+          type: unit.type,
+          level: 0,
+          path: `/${unit.code}`,
+          maxMembers: unit.maxMembers,
+          status: 'ACTIVE',
+          metadata: {},
+          settings: {},
+        },
+      })
+    )
+  );
+
+  console.log(`Created ${workingUnits.length} working unit groups`);
+
+  // Create Working Units (Nuclei - children of groups)
+  const nucleiData = [
+    { code: 'NUCLEO_JOVENS', name: 'Núcleo de Jovens', description: 'Núcleo dedicado aos membros jovens', parentCode: 'GRUPO_FORMACAO', maxMembers: 25 },
+    { code: 'NUCLEO_MULHERES', name: 'Núcleo de Mulheres', description: 'Núcleo dedicado às mulheres', parentCode: 'GRUPO_FORMACAO', maxMembers: 30 },
+    { code: 'NUCLEO_UNIVERSITARIO', name: 'Núcleo Universitário', description: 'Núcleo para estudantes universitários', parentCode: 'GRUPO_FORMACAO', maxMembers: 40 },
+    { code: 'NUCLEO_REDES_SOCIAIS', name: 'Núcleo de Redes Sociais', description: 'Gestão de mídias sociais', parentCode: 'GRUPO_COMUNICACAO', maxMembers: 8 },
+    { code: 'NUCLEO_IMPRENSA', name: 'Núcleo de Imprensa', description: 'Relacionamento com a imprensa', parentCode: 'GRUPO_COMUNICACAO', maxMembers: 6 },
+  ];
+
+  let nucleiCount = 0;
+  for (const nucleus of nucleiData) {
+    const parent = workingUnits.find(u => u.code === nucleus.parentCode);
+    if (parent) {
+      await prisma.workingUnit.upsert({
+        where: { tenantId_code: { tenantId: TENANT_ID, code: nucleus.code } },
+        update: {},
+        create: {
+          tenantId: TENANT_ID,
+          code: nucleus.code,
+          name: nucleus.name,
+          description: nucleus.description,
+          type: 'NUCLEUS',
+          parentId: parent.id,
+          level: 1,
+          path: `/${nucleus.parentCode}/${nucleus.code}`,
+          maxMembers: nucleus.maxMembers,
+          status: 'ACTIVE',
+          metadata: {},
+          settings: {},
+        },
+      });
+      nucleiCount++;
+    }
+  }
+
+  console.log(`Created ${nucleiCount} working unit nuclei`);
+
   console.log('Seed completed successfully!');
 }
 
