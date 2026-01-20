@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../infrastructure/prisma/prisma.module';
+import { PrismaService } from '@infrastructure/persistence/prisma.service';
 
 // Controllers
 import {
@@ -44,9 +44,10 @@ import {
 } from './outbound/repositories';
 
 @Module({
-  imports: [PrismaModule],
   controllers: [NetworkController, StructureTypesController, StructuresController, NetworkStatsController],
   providers: [
+    PrismaService,
+
     // Use Cases
     CreateNetworkNodeUseCase,
     UpdateNetworkNodeUseCase,
