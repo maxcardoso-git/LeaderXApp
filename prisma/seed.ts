@@ -480,11 +480,11 @@ async function main() {
 
   // Create Categories
   const categoriesData = [
-    { code: 'LEADERSHIP', name: 'Liderança', description: 'Categorias relacionadas a níveis de liderança', displayOrder: 1 },
-    { code: 'PARTICIPATION', name: 'Participação', description: 'Categorias de níveis de participação', displayOrder: 2 },
-    { code: 'FORMATION', name: 'Formação', description: 'Categorias de formação e capacitação', displayOrder: 3 },
-    { code: 'CONTRIBUTION', name: 'Contribuição', description: 'Categorias de níveis de contribuição', displayOrder: 4 },
-    { code: 'RECOGNITION', name: 'Reconhecimento', description: 'Categorias de reconhecimento e mérito', displayOrder: 5 },
+    { code: 'LEADERSHIP', name: 'Liderança', description: 'Categorias relacionadas a níveis de liderança', sortOrder: 1 },
+    { code: 'PARTICIPATION', name: 'Participação', description: 'Categorias de níveis de participação', sortOrder: 2 },
+    { code: 'FORMATION', name: 'Formação', description: 'Categorias de formação e capacitação', sortOrder: 3 },
+    { code: 'CONTRIBUTION', name: 'Contribuição', description: 'Categorias de níveis de contribuição', sortOrder: 4 },
+    { code: 'RECOGNITION', name: 'Reconhecimento', description: 'Categorias de reconhecimento e mérito', sortOrder: 5 },
   ];
 
   const categories = await Promise.all(
@@ -497,7 +497,7 @@ async function main() {
           code: category.code,
           name: category.name,
           description: category.description,
-          displayOrder: category.displayOrder,
+          sortOrder: category.sortOrder,
           status: 'ACTIVE',
         },
       })
