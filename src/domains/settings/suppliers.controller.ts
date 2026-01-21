@@ -35,57 +35,81 @@ export class SuppliersController {
   @Post()
   @ApiOperation({ summary: 'Create a new supplier' })
   async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    // Support both frontend format (nested objects) and flat format
+    const address = dto.address || {};
+    const contact = dto.contact?.manual || {};
+
+    // Map frontend fields to backend fields
+    const document = dto.cnpj || dto.document;
+    const tradeName = dto.legalName || dto.tradeName;
+    const email = contact.email || dto.email;
+    const phone = contact.phone || dto.phone;
+
+    // Generate code from name if not provided
+    const code = dto.code?.toUpperCase() ||
+      dto.name.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase().substring(0, 15) + '_' + Date.now().toString(36).toUpperCase();
+
     // Check for duplicate code
     const existingCode = await this.prisma.supplier.findUnique({
-      where: { tenantId_code: { tenantId, code: dto.code.toUpperCase() } },
+      where: { tenantId_code: { tenantId, code } },
     });
 
     if (existingCode) {
       throw new HttpException(
-        { error: 'SUPPLIER_CODE_EXISTS', message: `Supplier with code ${dto.code} already exists` },
+        { error: 'SUPPLIER_CODE_EXISTS', message: `Supplier with code ${code} already exists` },
         HttpStatus.CONFLICT,
       );
     }
 
     // Check for duplicate document if provided
-    if (dto.document) {
+    if (document) {
       const existingDoc = await this.prisma.supplier.findFirst({
-        where: { tenantId, document: dto.document },
+        where: { tenantId, document },
       });
 
       if (existingDoc) {
         throw new HttpException(
-          { error: 'SUPPLIER_DOCUMENT_EXISTS', message: `Supplier with document ${dto.document} already exists` },
+          { error: 'SUPPLIER_DOCUMENT_EXISTS', message: `Supplier with document ${document} already exists` },
           HttpStatus.CONFLICT,
         );
       }
     }
 
+    // Build metadata with extra fields from frontend
+    const metadata = {
+      ...(dto.metadata || {}),
+      pix: dto.pix,
+      bank: dto.bank,
+      stateRegistration: dto.stateRegistration,
+      municipalRegistration: dto.municipalRegistration,
+      contactName: contact.name,
+    };
+
     return this.prisma.supplier.create({
       data: {
         tenantId,
-        code: dto.code.toUpperCase(),
+        code,
         name: dto.name,
-        tradeName: dto.tradeName,
-        document: dto.document,
-        documentType: dto.documentType,
-        email: dto.email,
-        phone: dto.phone,
+        tradeName,
+        document,
+        documentType: dto.documentType || (document?.length === 14 ? 'CNPJ' : 'CPF'),
+        email,
+        phone,
         website: dto.website,
-        street: dto.street,
-        number: dto.number,
-        complement: dto.complement,
-        neighborhood: dto.neighborhood,
-        city: dto.city,
-        state: dto.state,
-        zipCode: dto.zipCode,
-        country: dto.country ?? 'BR',
+        street: address.street || dto.street,
+        number: address.number || dto.number,
+        complement: address.complement || dto.complement,
+        neighborhood: address.neighborhood || dto.neighborhood,
+        city: address.city || dto.city,
+        state: address.state || dto.state,
+        zipCode: address.zipCode || dto.zipCode,
+        country: address.country || dto.country || 'BR',
         categoryId: dto.categoryId,
         segmentId: dto.segmentId,
         status: 'ACTIVE',
         rating: dto.rating,
         notes: dto.notes,
-        metadata: dto.metadata ?? {},
+        metadata,
       },
     });
   }
@@ -148,44 +172,67 @@ export class SuppliersController {
       throw new HttpException({ error: 'SUPPLIER_NOT_FOUND' }, HttpStatus.NOT_FOUND);
     }
 
+    // Support both frontend format (nested objects) and flat format
+    const address = dto.address || {};
+    const contact = dto.contact?.manual || {};
+
+    // Map frontend fields to backend fields
+    const document = dto.cnpj || dto.document;
+    const tradeName = dto.legalName || dto.tradeName;
+    const email = contact.email || dto.email;
+    const phone = contact.phone || dto.phone;
+
     // Check for duplicate document if changed
-    if (dto.document && dto.document !== existing.document) {
+    const newDocument = document ?? existing.document;
+    if (newDocument && newDocument !== existing.document) {
       const existingDoc = await this.prisma.supplier.findFirst({
-        where: { tenantId, document: dto.document, id: { not: id } },
+        where: { tenantId, document: newDocument, id: { not: id } },
       });
 
       if (existingDoc) {
         throw new HttpException(
-          { error: 'SUPPLIER_DOCUMENT_EXISTS', message: `Supplier with document ${dto.document} already exists` },
+          { error: 'SUPPLIER_DOCUMENT_EXISTS', message: `Supplier with document ${newDocument} already exists` },
           HttpStatus.CONFLICT,
         );
       }
     }
 
+    // Merge metadata with extra fields from frontend
+    const existingMeta = (existing.metadata as Record<string, any>) || {};
+    const metadata = {
+      ...existingMeta,
+      ...(dto.metadata || {}),
+      ...(dto.pix !== undefined && { pix: dto.pix }),
+      ...(dto.bank !== undefined && { bank: dto.bank }),
+      ...(dto.stateRegistration !== undefined && { stateRegistration: dto.stateRegistration }),
+      ...(dto.municipalRegistration !== undefined && { municipalRegistration: dto.municipalRegistration }),
+      ...(contact.name !== undefined && { contactName: contact.name }),
+    };
+
     return this.prisma.supplier.update({
       where: { id },
       data: {
         name: dto.name ?? existing.name,
-        tradeName: dto.tradeName ?? existing.tradeName,
-        document: dto.document ?? existing.document,
+        tradeName: tradeName ?? existing.tradeName,
+        document: newDocument,
         documentType: dto.documentType ?? existing.documentType,
-        email: dto.email ?? existing.email,
-        phone: dto.phone ?? existing.phone,
+        email: email ?? existing.email,
+        phone: phone ?? existing.phone,
         website: dto.website ?? existing.website,
-        street: dto.street ?? existing.street,
-        number: dto.number ?? existing.number,
-        complement: dto.complement ?? existing.complement,
-        neighborhood: dto.neighborhood ?? existing.neighborhood,
-        city: dto.city ?? existing.city,
-        state: dto.state ?? existing.state,
-        zipCode: dto.zipCode ?? existing.zipCode,
-        country: dto.country ?? existing.country,
+        street: address.street || dto.street || existing.street,
+        number: address.number || dto.number || existing.number,
+        complement: address.complement || dto.complement || existing.complement,
+        neighborhood: address.neighborhood || dto.neighborhood || existing.neighborhood,
+        city: address.city || dto.city || existing.city,
+        state: address.state || dto.state || existing.state,
+        zipCode: address.zipCode || dto.zipCode || existing.zipCode,
+        country: address.country || dto.country || existing.country,
         categoryId: dto.categoryId ?? existing.categoryId,
         segmentId: dto.segmentId ?? existing.segmentId,
         status: dto.status ?? existing.status,
         rating: dto.rating ?? existing.rating,
         notes: dto.notes ?? existing.notes,
-        metadata: dto.metadata ?? existing.metadata,
+        metadata,
       },
     });
   }
