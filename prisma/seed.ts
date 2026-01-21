@@ -478,6 +478,94 @@ async function main() {
 
   console.log(`Created ${nucleiCount} working unit nuclei`);
 
+  // Create Categories
+  const categoriesData = [
+    { code: 'LEADERSHIP', name: 'Liderança', description: 'Categorias relacionadas a níveis de liderança', displayOrder: 1 },
+    { code: 'PARTICIPATION', name: 'Participação', description: 'Categorias de níveis de participação', displayOrder: 2 },
+    { code: 'FORMATION', name: 'Formação', description: 'Categorias de formação e capacitação', displayOrder: 3 },
+    { code: 'CONTRIBUTION', name: 'Contribuição', description: 'Categorias de níveis de contribuição', displayOrder: 4 },
+    { code: 'RECOGNITION', name: 'Reconhecimento', description: 'Categorias de reconhecimento e mérito', displayOrder: 5 },
+  ];
+
+  const categories = await Promise.all(
+    categoriesData.map((category) =>
+      prisma.category.upsert({
+        where: { tenantId_code: { tenantId: TENANT_ID, code: category.code } },
+        update: {},
+        create: {
+          tenantId: TENANT_ID,
+          code: category.code,
+          name: category.name,
+          description: category.description,
+          displayOrder: category.displayOrder,
+          status: 'ACTIVE',
+        },
+      })
+    )
+  );
+
+  console.log(`Created ${categories.length} categories`);
+
+  // Create Classifications for each category
+  const classificationsData = [
+    // Leadership classifications
+    { categoryCode: 'LEADERSHIP', name: 'Líder Regional', description: 'Líder de região', badgeColor: '#c4a45a', displayOrder: 1 },
+    { categoryCode: 'LEADERSHIP', name: 'Líder Local', description: 'Líder de unidade local', badgeColor: '#c4a45a', displayOrder: 2 },
+    { categoryCode: 'LEADERSHIP', name: 'Coordenador', description: 'Coordenador de grupo', badgeColor: '#3b82f6', displayOrder: 3 },
+    { categoryCode: 'LEADERSHIP', name: 'Facilitador', description: 'Facilitador de atividades', badgeColor: '#22c55e', displayOrder: 4 },
+
+    // Participation classifications
+    { categoryCode: 'PARTICIPATION', name: 'Membro Ativo', description: 'Membro com participação ativa', badgeColor: '#22c55e', displayOrder: 1 },
+    { categoryCode: 'PARTICIPATION', name: 'Membro Regular', description: 'Membro com participação regular', badgeColor: '#3b82f6', displayOrder: 2 },
+    { categoryCode: 'PARTICIPATION', name: 'Membro Eventual', description: 'Membro com participação eventual', badgeColor: '#f59e0b', displayOrder: 3 },
+    { categoryCode: 'PARTICIPATION', name: 'Membro Novo', description: 'Membro recém ingressado', badgeColor: '#8b5cf6', displayOrder: 4 },
+
+    // Formation classifications
+    { categoryCode: 'FORMATION', name: 'Formador', description: 'Responsável por formações', badgeColor: '#c4a45a', displayOrder: 1 },
+    { categoryCode: 'FORMATION', name: 'Em Formação Avançada', description: 'Em processo de formação avançada', badgeColor: '#3b82f6', displayOrder: 2 },
+    { categoryCode: 'FORMATION', name: 'Em Formação Básica', description: 'Em processo de formação básica', badgeColor: '#22c55e', displayOrder: 3 },
+    { categoryCode: 'FORMATION', name: 'Iniciante', description: 'Iniciando processo formativo', badgeColor: '#f59e0b', displayOrder: 4 },
+
+    // Contribution classifications
+    { categoryCode: 'CONTRIBUTION', name: 'Colaborador Destaque', description: 'Alto nível de contribuição', badgeColor: '#c4a45a', displayOrder: 1 },
+    { categoryCode: 'CONTRIBUTION', name: 'Colaborador Regular', description: 'Contribuição regular', badgeColor: '#3b82f6', displayOrder: 2 },
+    { categoryCode: 'CONTRIBUTION', name: 'Colaborador Inicial', description: 'Contribuição inicial', badgeColor: '#22c55e', displayOrder: 3 },
+
+    // Recognition classifications
+    { categoryCode: 'RECOGNITION', name: 'Embaixador', description: 'Máximo reconhecimento', badgeColor: '#c4a45a', displayOrder: 1 },
+    { categoryCode: 'RECOGNITION', name: 'Veterano', description: 'Membro veterano reconhecido', badgeColor: '#8b5cf6', displayOrder: 2 },
+    { categoryCode: 'RECOGNITION', name: 'Destaque do Ano', description: 'Reconhecimento anual', badgeColor: '#f59e0b', displayOrder: 3 },
+  ];
+
+  let classificationCount = 0;
+  for (const classification of classificationsData) {
+    const category = categories.find(c => c.code === classification.categoryCode);
+    if (category) {
+      await prisma.classification.upsert({
+        where: {
+          tenantId_categoryId_name: {
+            tenantId: TENANT_ID,
+            categoryId: category.id,
+            name: classification.name
+          }
+        },
+        update: {},
+        create: {
+          tenantId: TENANT_ID,
+          categoryId: category.id,
+          name: classification.name,
+          description: classification.description,
+          badgeColor: classification.badgeColor,
+          displayOrder: classification.displayOrder,
+          status: 'ACTIVE',
+        },
+      });
+      classificationCount++;
+    }
+  }
+
+  console.log(`Created ${classificationCount} classifications`);
+
   console.log('Seed completed successfully!');
 }
 
