@@ -122,6 +122,14 @@ export class IdentityUserRepository implements IdentityUserRepositoryPort {
     });
   }
 
+  async delete(tenantId: string, userId: string, ctx?: TransactionContext): Promise<void> {
+    const client = ctx?.tx ?? this.prisma;
+
+    await client.identityUser.deleteMany({
+      where: { id: userId, tenantId },
+    });
+  }
+
   async existsByEmail(
     tenantId: string,
     email: string,

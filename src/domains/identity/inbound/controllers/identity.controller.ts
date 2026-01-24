@@ -23,6 +23,7 @@ import {
   CreateUserUseCase,
   UpdateUserUseCase,
   DeactivateUserUseCase,
+  DeleteUserUseCase,
   ListUsersUseCase,
   GetUserUseCase,
   CreatePermissionUseCase,
@@ -74,6 +75,7 @@ export class IdentityController {
     private readonly createUserUseCase: CreateUserUseCase,
     private readonly updateUserUseCase: UpdateUserUseCase,
     private readonly deactivateUserUseCase: DeactivateUserUseCase,
+    private readonly deleteUserUseCase: DeleteUserUseCase,
     private readonly listUsersUseCase: ListUsersUseCase,
     private readonly getUserUseCase: GetUserUseCase,
     private readonly createPermissionUseCase: CreatePermissionUseCase,
@@ -177,17 +179,17 @@ export class IdentityController {
   }
 
   @Delete('users/:userId')
-  @ApiOperation({ summary: 'Deactivate a user (soft delete)' })
-  @ApiResponse({ status: 200, description: 'User deactivated successfully' })
+  @ApiOperation({ summary: 'Delete a user permanently' })
+  @ApiResponse({ status: 200, description: 'User deleted successfully' })
   @ApiResponse({ status: 404, description: 'User not found' })
   @ApiHeader({ name: 'X-Tenant-Id', required: true })
   @ApiParam({ name: 'userId', description: 'User ID' })
-  async deactivateUser(
+  async deleteUser(
     @Headers('x-tenant-id') tenantId: string,
     @Param('userId') userId: string,
   ) {
     try {
-      return await this.deactivateUserUseCase.execute({ tenantId, userId });
+      return await this.deleteUserUseCase.execute({ tenantId, userId });
     } catch (error) {
       this.handleError(error);
     }

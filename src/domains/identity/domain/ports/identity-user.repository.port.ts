@@ -37,6 +37,8 @@ export interface IdentityUserRepositoryPort {
 
   update(user: IdentityUser, ctx?: TransactionContext): Promise<void>;
 
+  delete(tenantId: string, userId: string, ctx?: TransactionContext): Promise<void>;
+
   existsByEmail(
     tenantId: string,
     email: string,

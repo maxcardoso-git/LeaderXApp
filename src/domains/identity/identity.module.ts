@@ -25,6 +25,7 @@ import {
   CreateUserUseCase,
   UpdateUserUseCase,
   DeactivateUserUseCase,
+  DeleteUserUseCase,
   ListUsersUseCase,
   GetUserUseCase,
   CreatePermissionUseCase,
@@ -76,6 +77,7 @@ const useCases = [
   CreateUserUseCase,
   UpdateUserUseCase,
   DeactivateUserUseCase,
+  DeleteUserUseCase,
   ListUsersUseCase,
   GetUserUseCase,
   // Permission

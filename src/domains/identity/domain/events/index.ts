@@ -53,6 +53,21 @@ export class UserDeactivatedEvent implements IdentityDomainEvent {
   ) {}
 }
 
+export class UserDeletedEvent implements IdentityDomainEvent {
+  readonly aggregateType = 'IDENTITY';
+  readonly eventType = 'Identity.UserDeleted';
+
+  constructor(
+    readonly aggregateId: string,
+    readonly payload: {
+      userId: string;
+      tenantId: string;
+      email?: string;
+      deletedAt: string;
+    },
+  ) {}
+}
+
 // Permission Events
 export class PermissionCreatedEvent implements IdentityDomainEvent {
   readonly aggregateType = 'IDENTITY';
