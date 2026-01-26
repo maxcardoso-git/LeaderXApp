@@ -35,33 +35,45 @@ export class CyclesController {
   @Post()
   @ApiOperation({ summary: 'Create a new cycle' })
   async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    // Generate code from name if not provided
+    const code = dto.code?.toUpperCase() || dto.name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 20);
+
     const existing = await this.prisma.cycle.findUnique({
-      where: { tenantId_code: { tenantId, code: dto.code.toUpperCase() } },
+      where: { tenantId_code: { tenantId, code } },
     });
 
     if (existing) {
       throw new HttpException({ error: 'CYCLE_CODE_EXISTS' }, HttpStatus.CONFLICT);
     }
 
+    // Support both isCurrent (backend) and isDefault (frontend)
+    const isCurrent = dto.isCurrent ?? dto.isDefault ?? false;
+
     // If this is the first cycle or marked as current, update other cycles
-    if (dto.isCurrent) {
+    if (isCurrent) {
       await this.prisma.cycle.updateMany({
         where: { tenantId, isCurrent: true },
         data: { isCurrent: false },
       });
     }
 
+    // Store phaseBlocks in metadata if provided
+    const metadata = dto.metadata ?? {};
+    if (dto.phaseBlocks) {
+      metadata.phaseBlocks = dto.phaseBlocks;
+    }
+
     return this.prisma.cycle.create({
       data: {
         tenantId,
-        code: dto.code.toUpperCase(),
+        code,
         name: dto.name,
         description: dto.description,
-        startDate: new Date(dto.startDate),
-        endDate: new Date(dto.endDate),
-        isCurrent: dto.isCurrent ?? false,
-        status: dto.status ?? 'PLANNED',
-        metadata: dto.metadata ?? {},
+        startDate: dto.startDate ? new Date(dto.startDate) : new Date(),
+        endDate: dto.endDate ? new Date(dto.endDate) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Default: 1 year
+        isCurrent,
+        status: dto.status ?? 'ACTIVE',
+        metadata,
       },
     });
   }
@@ -87,7 +99,7 @@ export class CyclesController {
 
     if (status) where.status = status;
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.cycle.findMany({
         where,
         skip,
@@ -96,6 +108,13 @@ export class CyclesController {
       }),
       this.prisma.cycle.count({ where }),
     ]);
+
+    // Transform items to include isDefault and phaseBlocks at root level
+    const items = rawItems.map((item) => ({
+      ...item,
+      isDefault: item.isCurrent,
+      phaseBlocks: (item.metadata as any)?.phaseBlocks || {},
+    }));
 
     return { items, page: Number(page), size: Number(size), total };
   }
@@ -138,26 +157,44 @@ export class CyclesController {
     const existing = await this.prisma.cycle.findFirst({ where: { id, tenantId } });
     if (!existing) throw new HttpException({ error: 'CYCLE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
 
+    // Support both isCurrent (backend) and isDefault (frontend)
+    const isCurrent = dto.isCurrent ?? dto.isDefault;
+
     // If setting as current, unset other cycles
-    if (dto.isCurrent && !existing.isCurrent) {
+    if (isCurrent && !existing.isCurrent) {
       await this.prisma.cycle.updateMany({
         where: { tenantId, isCurrent: true },
         data: { isCurrent: false },
       });
     }
 
-    return this.prisma.cycle.update({
+    // Merge phaseBlocks into metadata
+    let metadata = existing.metadata as any || {};
+    if (dto.phaseBlocks) {
+      metadata = { ...metadata, phaseBlocks: dto.phaseBlocks };
+    } else if (dto.metadata) {
+      metadata = dto.metadata;
+    }
+
+    const updated = await this.prisma.cycle.update({
       where: { id },
       data: {
         name: dto.name ?? existing.name,
         description: dto.description ?? existing.description,
         startDate: dto.startDate ? new Date(dto.startDate) : existing.startDate,
         endDate: dto.endDate ? new Date(dto.endDate) : existing.endDate,
-        isCurrent: dto.isCurrent ?? existing.isCurrent,
+        isCurrent: isCurrent ?? existing.isCurrent,
         status: dto.status ?? existing.status,
-        metadata: dto.metadata ?? existing.metadata,
+        metadata,
       },
     });
+
+    // Return with frontend-friendly format
+    return {
+      ...updated,
+      isDefault: updated.isCurrent,
+      phaseBlocks: (updated.metadata as any)?.phaseBlocks || {},
+    };
   }
 
   @Put(':id/activate')
