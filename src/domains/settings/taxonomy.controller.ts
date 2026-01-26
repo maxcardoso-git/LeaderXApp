@@ -294,25 +294,34 @@ export class LinesController {
   @Post()
   @ApiOperation({ summary: 'Create a new line' })
   async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    // Generate code from name if not provided
+    const code = dto.code?.toUpperCase() || dto.name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 30);
+
     const existing = await this.prisma.line.findUnique({
-      where: { tenantId_code: { tenantId, code: dto.code.toUpperCase() } },
+      where: { tenantId_code: { tenantId, code } },
     });
 
     if (existing) {
       throw new HttpException({ error: 'LINE_CODE_EXISTS' }, HttpStatus.CONFLICT);
     }
 
+    // Store allowedBlocks in metadata if provided
+    const metadata = dto.metadata ?? {};
+    if (dto.allowedBlocks) {
+      metadata.allowedBlocks = dto.allowedBlocks;
+    }
+
     return this.prisma.line.create({
       data: {
         tenantId,
-        code: dto.code.toUpperCase(),
+        code,
         name: dto.name,
         description: dto.description,
         segmentId: dto.segmentId,
         icon: dto.icon,
         color: dto.color,
         sortOrder: dto.sortOrder ?? 0,
-        metadata: dto.metadata ?? {},
+        metadata,
       },
     });
   }
@@ -338,10 +347,16 @@ export class LinesController {
 
     if (segmentId) where.segmentId = segmentId;
 
-    const [items, total] = await Promise.all([
+    const [rawItems, total] = await Promise.all([
       this.prisma.line.findMany({ where, skip, take: Number(size), orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] }),
       this.prisma.line.count({ where }),
     ]);
+
+    // Transform items to include allowedBlocks at root level
+    const items = rawItems.map((item) => ({
+      ...item,
+      allowedBlocks: (item.metadata as any)?.allowedBlocks || {},
+    }));
 
     return { items, page: Number(page), size: Number(size), total };
   }
@@ -360,7 +375,15 @@ export class LinesController {
     const existing = await this.prisma.line.findFirst({ where: { id, tenantId } });
     if (!existing) throw new HttpException({ error: 'LINE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
 
-    return this.prisma.line.update({
+    // Merge allowedBlocks into metadata
+    let metadata = (existing.metadata as any) || {};
+    if (dto.allowedBlocks) {
+      metadata = { ...metadata, allowedBlocks: dto.allowedBlocks };
+    } else if (dto.metadata) {
+      metadata = dto.metadata;
+    }
+
+    const updated = await this.prisma.line.update({
       where: { id },
       data: {
         name: dto.name ?? existing.name,
@@ -370,9 +393,15 @@ export class LinesController {
         color: dto.color ?? existing.color,
         sortOrder: dto.sortOrder ?? existing.sortOrder,
         status: dto.status ?? existing.status,
-        metadata: dto.metadata ?? existing.metadata,
+        metadata,
       },
     });
+
+    // Return with frontend-friendly format
+    return {
+      ...updated,
+      allowedBlocks: (updated.metadata as any)?.allowedBlocks || {},
+    };
   }
 
   @Delete(':id')
