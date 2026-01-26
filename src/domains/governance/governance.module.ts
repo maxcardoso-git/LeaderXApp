@@ -34,6 +34,7 @@ import {
   WorkingUnitsController,
   PositionsController,
   HierarchyGroupsController,
+  ScopesController,
   GovernanceStatsController,
 } from './inbound/controllers';
 
@@ -60,6 +61,7 @@ const useCases = [
     WorkingUnitsController,
     PositionsController,
     HierarchyGroupsController,
+    ScopesController,
     GovernanceStatsController,
   ],
   providers: [

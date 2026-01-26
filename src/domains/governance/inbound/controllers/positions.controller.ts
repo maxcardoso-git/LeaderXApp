@@ -230,3 +230,107 @@ export class HierarchyGroupsController {
     return existing;
   }
 }
+
+// ============================================
+// SCOPES (ESCOPOS DE ESTRUTURA) CONTROLLER
+// ============================================
+
+@ApiTags('Governance - Scopes')
+@Controller('governance/scopes')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class ScopesController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new scope' })
+  async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    const code = dto.code?.toUpperCase() || dto.name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 30);
+
+    const existing = await this.prisma.scope.findUnique({
+      where: { tenantId_code: { tenantId, code } },
+    });
+
+    if (existing) {
+      throw new HttpException({ error: 'SCOPE_CODE_EXISTS' }, HttpStatus.CONFLICT);
+    }
+
+    return this.prisma.scope.create({
+      data: {
+        tenantId,
+        code,
+        name: dto.name,
+        description: dto.description,
+        level: dto.level ?? 1,
+        sortOrder: dto.sortOrder ?? 0,
+      },
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List scopes' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 25,
+    @Query('search') search?: string,
+  ) {
+    const skip = (Number(page) - 1) * Number(size);
+    const where: any = { tenantId };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search.toUpperCase(), mode: 'insensitive' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.scope.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: [{ level: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.scope.count({ where }),
+    ]);
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get scope by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const scope = await this.prisma.scope.findFirst({ where: { id, tenantId } });
+    if (!scope) throw new HttpException({ error: 'SCOPE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    return scope;
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update scope' })
+  async update(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    const existing = await this.prisma.scope.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'SCOPE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    return this.prisma.scope.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        description: dto.description ?? existing.description,
+        level: dto.level ?? existing.level,
+        sortOrder: dto.sortOrder ?? existing.sortOrder,
+        status: dto.status ?? existing.status,
+      },
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete scope' })
+  async delete(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const existing = await this.prisma.scope.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'SCOPE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    await this.prisma.scope.delete({ where: { id } });
+    return existing;
+  }
+}

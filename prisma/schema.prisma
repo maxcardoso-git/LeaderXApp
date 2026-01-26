@@ -973,6 +973,26 @@ model HierarchyGroup {
   @@map("hierarchy_groups")
 }
 
+/// Scope - structure scope levels (geographic/organizational)
+model Scope {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  code        String
+  name        String
+  description String?
+  level       Int      @default(1)
+  sortOrder   Int      @default(0) @map("sort_order")
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, level])
+  @@map("scopes")
+}
+
 /// Cycle - business/workflow cycles
 model Cycle {
   id          String    @id @default(uuid())
