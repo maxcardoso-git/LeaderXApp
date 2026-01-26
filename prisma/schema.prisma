@@ -706,22 +706,27 @@ model NetworkRelation {
 
 /// StructureType - defines types of organizational structures
 model StructureType {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  code        String   // COMMUNITY | EVENT | TABLE | NETWORK | TEAM | DEPARTMENT
-  name        String
-  description String?
-  icon        String?
-  color       String?
-  maxLevels   Int      @default(5) @map("max_levels")
-  allowNested Boolean  @default(true) @map("allow_nested")
-  metadata    Json?
-  status      String   @default("ACTIVE") // ACTIVE | INACTIVE
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  code             String   // COMMUNITY | EVENT | TABLE | NETWORK | TEAM | DEPARTMENT
+  name             String
+  description      String?
+  icon             String?
+  color            String?
+  scope            String?  // GLOBAL_ALL_COUNTRIES | COUNTRY_GROUP | CITY_GROUP | SINGLE_CITY
+  hierarchyLevel   Int?     @map("hierarchy_level")
+  leadershipRoleId String?  @map("leadership_role_id")
+  maxLeaders       Int      @default(1) @map("max_leaders")
+  maxLevels        Int      @default(5) @map("max_levels")
+  allowNested      Boolean  @default(true) @map("allow_nested")
+  metadata         Json?
+  status           String   @default("ACTIVE") // ACTIVE | INACTIVE
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   // Relations
-  structures Structure[]
+  structures     Structure[]
+  leadershipRole Position?   @relation(fields: [leadershipRoleId], references: [id])
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -944,6 +949,9 @@ model Position {
   metadata       Json?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  structureTypes StructureType[]
 
   @@unique([tenantId, code])
   @@index([tenantId])

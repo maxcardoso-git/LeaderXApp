@@ -216,9 +216,10 @@ export class ValidateAuthorityResponseDto {
 // ============================================
 
 export class CreateStructureTypeDto {
-  @ApiProperty({ description: 'Unique code for the structure type' })
+  @ApiPropertyOptional({ description: 'Unique code for the structure type (auto-generated from name if not provided)' })
+  @IsOptional()
   @IsString()
-  code: string;
+  code?: string;
 
   @ApiProperty({ description: 'Display name' })
   @IsString()
@@ -238,6 +239,26 @@ export class CreateStructureTypeDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @ApiPropertyOptional({ description: 'Scope of the structure type', enum: ['GLOBAL_ALL_COUNTRIES', 'COUNTRY_GROUP', 'CITY_GROUP', 'SINGLE_CITY'] })
+  @IsOptional()
+  @IsString()
+  scope?: string;
+
+  @ApiPropertyOptional({ description: 'Hierarchy level' })
+  @IsOptional()
+  @IsNumber()
+  hierarchyLevel?: number;
+
+  @ApiPropertyOptional({ description: 'Leadership role/position ID' })
+  @IsOptional()
+  @IsString()
+  leadershipRoleId?: string;
+
+  @ApiPropertyOptional({ description: 'Maximum number of leaders', default: 1 })
+  @IsOptional()
+  @IsNumber()
+  maxLeaders?: number;
 
   @ApiPropertyOptional({ description: 'Maximum hierarchy levels', default: 5 })
   @IsOptional()
@@ -273,6 +294,26 @@ export class UpdateStructureTypeDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @ApiPropertyOptional({ description: 'Scope of the structure type', enum: ['GLOBAL_ALL_COUNTRIES', 'COUNTRY_GROUP', 'CITY_GROUP', 'SINGLE_CITY'] })
+  @IsOptional()
+  @IsString()
+  scope?: string;
+
+  @ApiPropertyOptional({ description: 'Hierarchy level' })
+  @IsOptional()
+  @IsNumber()
+  hierarchyLevel?: number;
+
+  @ApiPropertyOptional({ description: 'Leadership role/position ID' })
+  @IsOptional()
+  @IsString()
+  leadershipRoleId?: string;
+
+  @ApiPropertyOptional({ description: 'Maximum number of leaders' })
+  @IsOptional()
+  @IsNumber()
+  maxLeaders?: number;
 
   @ApiPropertyOptional({ description: 'Maximum hierarchy levels' })
   @IsOptional()
@@ -336,6 +377,21 @@ export class StructureTypeResponseDto {
 
   @ApiPropertyOptional()
   color?: string;
+
+  @ApiPropertyOptional()
+  scope?: string;
+
+  @ApiPropertyOptional()
+  hierarchyLevel?: number;
+
+  @ApiPropertyOptional()
+  leadershipRoleId?: string;
+
+  @ApiPropertyOptional()
+  leadershipRole?: { id: string; name: string };
+
+  @ApiProperty()
+  maxLeaders: number;
 
   @ApiProperty()
   maxLevels: number;

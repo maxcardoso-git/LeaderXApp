@@ -38,6 +38,13 @@ export class StructureTypesController {
       description: entity.description,
       icon: entity.icon,
       color: entity.color,
+      scope: entity.scope,
+      hierarchyLevel: entity.hierarchyLevel,
+      leadershipRoleId: entity.leadershipRoleId,
+      leadershipRole: entity.leadershipRole
+        ? { id: entity.leadershipRole.id, name: entity.leadershipRole.name }
+        : undefined,
+      maxLeaders: entity.maxLeaders,
       maxLevels: entity.maxLevels,
       allowNested: entity.allowNested,
       metadata: entity.metadata as Record<string, unknown>,
@@ -55,14 +62,17 @@ export class StructureTypesController {
     @Headers('x-tenant-id') tenantId: string,
     @Body() dto: CreateStructureTypeDto,
   ): Promise<StructureTypeResponseDto> {
+    // Auto-generate code from name if not provided
+    const code = dto.code?.toUpperCase() || dto.name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 30);
+
     // Check for duplicate code
     const existing = await this.prisma.structureType.findUnique({
-      where: { tenantId_code: { tenantId, code: dto.code.toUpperCase() } },
+      where: { tenantId_code: { tenantId, code } },
     });
 
     if (existing) {
       throw new HttpException(
-        { error: 'STRUCTURE_TYPE_CODE_EXISTS', message: `Structure type with code ${dto.code} already exists` },
+        { error: 'STRUCTURE_TYPE_CODE_EXISTS', message: `Structure type with code ${code} already exists` },
         HttpStatus.CONFLICT,
       );
     }
@@ -70,16 +80,21 @@ export class StructureTypesController {
     const structureType = await this.prisma.structureType.create({
       data: {
         tenantId,
-        code: dto.code.toUpperCase(),
+        code,
         name: dto.name,
         description: dto.description,
         icon: dto.icon,
         color: dto.color,
+        scope: dto.scope,
+        hierarchyLevel: dto.hierarchyLevel,
+        leadershipRoleId: dto.leadershipRoleId,
+        maxLeaders: dto.maxLeaders ?? 1,
         maxLevels: dto.maxLevels ?? 5,
         allowNested: dto.allowNested ?? true,
         metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue,
         status: 'ACTIVE',
       },
+      include: { leadershipRole: true },
     });
 
     return this.toResponse(structureType);
@@ -114,7 +129,8 @@ export class StructureTypesController {
         where,
         skip,
         take: size,
-        orderBy: { name: 'asc' },
+        orderBy: [{ hierarchyLevel: 'asc' }, { name: 'asc' }],
+        include: { leadershipRole: true },
       }),
       this.prisma.structureType.count({ where }),
     ]);
@@ -137,6 +153,7 @@ export class StructureTypesController {
   ): Promise<StructureTypeResponseDto> {
     const structureType = await this.prisma.structureType.findFirst({
       where: { id: typeId, tenantId },
+      include: { leadershipRole: true },
     });
 
     if (!structureType) {
@@ -176,11 +193,16 @@ export class StructureTypesController {
         description: dto.description ?? existing.description,
         icon: dto.icon ?? existing.icon,
         color: dto.color ?? existing.color,
+        scope: dto.scope ?? existing.scope,
+        hierarchyLevel: dto.hierarchyLevel ?? existing.hierarchyLevel,
+        leadershipRoleId: dto.leadershipRoleId ?? existing.leadershipRoleId,
+        maxLeaders: dto.maxLeaders ?? existing.maxLeaders,
         maxLevels: dto.maxLevels ?? existing.maxLevels,
         allowNested: dto.allowNested ?? existing.allowNested,
         metadata: (dto.metadata ?? existing.metadata ?? {}) as Prisma.InputJsonValue,
         status: dto.status ?? existing.status,
       },
+      include: { leadershipRole: true },
     });
 
     return this.toResponse(structureType);
