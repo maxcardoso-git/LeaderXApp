@@ -532,3 +532,133 @@ export class ClassificationsController {
   }
 }
 
+// ============================================
+// PROGRAMS CONTROLLER
+// ============================================
+
+@ApiTags('Taxonomy - Programs')
+@Controller('taxonomy/programs')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class ProgramsController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new program' })
+  async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    const code = dto.code?.toUpperCase() || dto.name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 30);
+
+    const existing = await this.prisma.program.findUnique({
+      where: { tenantId_code: { tenantId, code } },
+    });
+
+    if (existing) {
+      throw new HttpException({ error: 'PROGRAM_CODE_EXISTS' }, HttpStatus.CONFLICT);
+    }
+
+    // Verify category exists if provided
+    if (dto.categoryId) {
+      const category = await this.prisma.category.findFirst({
+        where: { id: dto.categoryId, tenantId },
+      });
+      if (!category) {
+        throw new HttpException({ error: 'CATEGORY_NOT_FOUND' }, HttpStatus.BAD_REQUEST);
+      }
+    }
+
+    return this.prisma.program.create({
+      data: {
+        tenantId,
+        code,
+        name: dto.name,
+        description: dto.description,
+        categoryId: dto.categoryId || null,
+        isActive: dto.isActive ?? true,
+        metadata: dto.metadata ?? {},
+      },
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List programs' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 25,
+    @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('isActive') isActive?: string,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * size;
+    const where: any = { tenantId };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search.toUpperCase(), mode: 'insensitive' } },
+      ];
+    }
+
+    if (categoryId) where.categoryId = categoryId;
+    if (isActive !== undefined) where.isActive = isActive === 'true';
+
+    const [items, total] = await Promise.all([
+      this.prisma.program.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: [{ name: 'asc' }]
+      }),
+      this.prisma.program.count({ where }),
+    ]);
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get program by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const program = await this.prisma.program.findFirst({ where: { id, tenantId } });
+    if (!program) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    return program;
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update program' })
+  async update(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    const existing = await this.prisma.program.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Verify category exists if provided
+    if (dto.categoryId) {
+      const category = await this.prisma.category.findFirst({
+        where: { id: dto.categoryId, tenantId },
+      });
+      if (!category) {
+        throw new HttpException({ error: 'CATEGORY_NOT_FOUND' }, HttpStatus.BAD_REQUEST);
+      }
+    }
+
+    return this.prisma.program.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        description: dto.description ?? existing.description,
+        categoryId: dto.categoryId !== undefined ? dto.categoryId || null : existing.categoryId,
+        isActive: dto.isActive ?? existing.isActive,
+        metadata: dto.metadata ?? existing.metadata,
+      },
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete program' })
+  async delete(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const existing = await this.prisma.program.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    await this.prisma.program.delete({ where: { id } });
+    return existing;
+  }
+}
+
