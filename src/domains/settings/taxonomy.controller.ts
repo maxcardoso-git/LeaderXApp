@@ -660,5 +660,246 @@ export class ProgramsController {
     await this.prisma.program.delete({ where: { id } });
     return existing;
   }
+
+  @Get(':id/full')
+  @ApiOperation({ summary: 'Get program with pricing and benefits' })
+  async getFullById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const program = await this.prisma.program.findFirst({
+      where: { id, tenantId },
+      include: {
+        pricing: true,
+        benefits: {
+          include: { benefit: true },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+    if (!program) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Check if category has classifications (for benefits eligibility)
+    let canHaveBenefits = false;
+    if (program.categoryId) {
+      const classificationsCount = await this.prisma.classification.count({
+        where: { tenantId, categoryId: program.categoryId },
+      });
+      canHaveBenefits = classificationsCount > 0;
+    }
+
+    return { ...program, canHaveBenefits };
+  }
+
+  @Put(':id/pricing')
+  @ApiOperation({ summary: 'Update or create program pricing' })
+  async updatePricing(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    const program = await this.prisma.program.findFirst({ where: { id, tenantId } });
+    if (!program) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    const existingPricing = await this.prisma.planPricing.findUnique({ where: { programId: id } });
+
+    if (existingPricing) {
+      return this.prisma.planPricing.update({
+        where: { programId: id },
+        data: {
+          monthlyValue: dto.monthlyValue ?? existingPricing.monthlyValue,
+          currency: dto.currency ?? existingPricing.currency,
+          validity: dto.validity ?? existingPricing.validity,
+          pointsPerMonth: dto.pointsPerMonth ?? existingPricing.pointsPerMonth,
+          metadata: dto.metadata ?? existingPricing.metadata,
+        },
+      });
+    }
+
+    return this.prisma.planPricing.create({
+      data: {
+        tenantId,
+        programId: id,
+        monthlyValue: dto.monthlyValue || 0,
+        currency: dto.currency || 'BRL',
+        validity: dto.validity,
+        pointsPerMonth: dto.pointsPerMonth || 0,
+        metadata: dto.metadata ?? {},
+      },
+    });
+  }
+
+  @Put(':id/benefits')
+  @ApiOperation({ summary: 'Set program benefits' })
+  async setBenefits(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: { benefitIds: string[] }) {
+    const program = await this.prisma.program.findFirst({ where: { id, tenantId } });
+    if (!program) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Check if program's category has classifications
+    if (program.categoryId) {
+      const classificationsCount = await this.prisma.classification.count({
+        where: { tenantId, categoryId: program.categoryId },
+      });
+      if (classificationsCount === 0 && dto.benefitIds.length > 0) {
+        throw new HttpException(
+          { error: 'CATEGORY_NO_CLASSIFICATION', message: 'Programs with categories without classification cannot have benefits' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    } else if (dto.benefitIds.length > 0) {
+      throw new HttpException(
+        { error: 'PROGRAM_NO_CATEGORY', message: 'Programs without category cannot have benefits' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Delete existing benefits
+    await this.prisma.planBenefit.deleteMany({ where: { programId: id } });
+
+    // Create new benefits
+    if (dto.benefitIds.length > 0) {
+      await this.prisma.planBenefit.createMany({
+        data: dto.benefitIds.map((benefitId, index) => ({
+          tenantId,
+          programId: id,
+          benefitId,
+          sortOrder: index,
+        })),
+      });
+    }
+
+    return this.prisma.planBenefit.findMany({
+      where: { programId: id },
+      include: { benefit: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+  }
+}
+
+// ============================================
+// SUBSCRIBER BENEFITS CONTROLLER
+// ============================================
+
+@ApiTags('Taxonomy - Subscriber Benefits')
+@Controller('taxonomy/benefits')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class SubscriberBenefitsController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new subscriber benefit' })
+  async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    const code = dto.code?.toUpperCase() || dto.name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 30);
+
+    const existing = await this.prisma.subscriberBenefit.findUnique({
+      where: { tenantId_code: { tenantId, code } },
+    });
+
+    if (existing) {
+      throw new HttpException({ error: 'BENEFIT_CODE_EXISTS' }, HttpStatus.CONFLICT);
+    }
+
+    return this.prisma.subscriberBenefit.create({
+      data: {
+        tenantId,
+        code,
+        name: dto.name,
+        description: dto.description,
+        type: dto.type || 'OTHER',
+        icon: dto.icon,
+        isActive: dto.isActive ?? true,
+        metadata: dto.metadata ?? {},
+      },
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List subscriber benefits' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 100,
+    @Query('search') search?: string,
+    @Query('type') type?: string,
+    @Query('isActive') isActive?: string,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * size;
+    const where: any = { tenantId };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search.toUpperCase(), mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (type) where.type = type;
+    if (isActive !== undefined) where.isActive = isActive === 'true';
+
+    const [items, total] = await Promise.all([
+      this.prisma.subscriberBenefit.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: [{ type: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.subscriberBenefit.count({ where }),
+    ]);
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get('types')
+  @ApiOperation({ summary: 'List benefit types' })
+  async listTypes(@Headers('x-tenant-id') tenantId: string) {
+    const types = await this.prisma.subscriberBenefit.groupBy({
+      by: ['type'],
+      where: { tenantId },
+      _count: true,
+    });
+
+    return types.map((t) => ({ type: t.type, count: t._count }));
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get benefit by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const benefit = await this.prisma.subscriberBenefit.findFirst({ where: { id, tenantId } });
+    if (!benefit) throw new HttpException({ error: 'BENEFIT_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    return benefit;
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update benefit' })
+  async update(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    const existing = await this.prisma.subscriberBenefit.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'BENEFIT_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    return this.prisma.subscriberBenefit.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        description: dto.description ?? existing.description,
+        type: dto.type ?? existing.type,
+        icon: dto.icon ?? existing.icon,
+        isActive: dto.isActive ?? existing.isActive,
+        metadata: dto.metadata ?? existing.metadata,
+      },
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete benefit' })
+  async delete(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const existing = await this.prisma.subscriberBenefit.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'BENEFIT_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Check if benefit is used by any plan
+    const usageCount = await this.prisma.planBenefit.count({ where: { benefitId: id } });
+    if (usageCount > 0) {
+      throw new HttpException(
+        { error: 'BENEFIT_IN_USE', message: `This benefit is used by ${usageCount} plan(s)` },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.prisma.subscriberBenefit.delete({ where: { id } });
+    return existing;
+  }
 }
 

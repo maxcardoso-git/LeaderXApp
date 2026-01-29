@@ -931,7 +931,7 @@ model Classification {
   @@map("classifications")
 }
 
-/// Program - organizational programs
+/// Program - organizational programs (Plans)
 model Program {
   id          String   @id @default(uuid())
   tenantId    String   @map("tenant_id")
@@ -944,11 +944,80 @@ model Program {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  // Relations
+  pricing     PlanPricing?
+  benefits    PlanBenefit[]
+
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([tenantId, categoryId])
   @@index([tenantId, isActive])
   @@map("programs")
+}
+
+/// PlanPricing - pricing information for programs/plans
+model PlanPricing {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  programId      String   @unique @map("program_id")
+  monthlyValue   Decimal  @map("monthly_value") @db.Decimal(10, 2)
+  currency       String   @default("BRL")
+  validity       String?  // e.g., "12 months", "Annual", "Monthly"
+  pointsPerMonth Int      @default(0) @map("points_per_month")
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  program Program @relation(fields: [programId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([programId])
+  @@map("plan_pricing")
+}
+
+/// SubscriberBenefit - benefits that can be assigned to plans
+model SubscriberBenefit {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  code        String
+  name        String
+  description String?
+  type        String   // EXCLUSIVE | DISCOUNT | ACCESS | POINTS | OTHER
+  icon        String?
+  isActive    Boolean  @default(true) @map("is_active")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  planBenefits PlanBenefit[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@index([tenantId, isActive])
+  @@map("subscriber_benefits")
+}
+
+/// PlanBenefit - junction table linking plans to benefits
+model PlanBenefit {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  programId  String   @map("program_id")
+  benefitId  String   @map("benefit_id")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  program Program           @relation(fields: [programId], references: [id], onDelete: Cascade)
+  benefit SubscriberBenefit @relation(fields: [benefitId], references: [id], onDelete: Cascade)
+
+  @@unique([programId, benefitId])
+  @@index([tenantId])
+  @@index([programId])
+  @@index([benefitId])
+  @@map("plan_benefits")
 }
 
 /// Position - organizational positions (cargos)
