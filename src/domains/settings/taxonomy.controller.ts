@@ -608,7 +608,14 @@ export class ProgramsController {
         where,
         skip,
         take: Number(size),
-        orderBy: [{ name: 'asc' }]
+        orderBy: [{ name: 'asc' }],
+        include: {
+          pricing: true,
+          benefits: {
+            include: { benefit: true },
+            orderBy: { sortOrder: 'asc' },
+          },
+        },
       }),
       this.prisma.program.count({ where }),
     ]);
