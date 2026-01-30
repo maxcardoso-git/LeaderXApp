@@ -1154,6 +1154,81 @@ model Supplier {
 // GOVERNANCE DOMAIN - Working Units
 // ============================================
 
+// ============================================
+// EVENT TYPES & VENUES (TAXONOMY)
+// ============================================
+
+/// EventType - types of events that can be hosted
+model EventType {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  venueEventTypes EventVenueEventType[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@map("event_types")
+}
+
+/// EventVenue - locations where events can be held
+model EventVenue {
+  id                    String   @id @default(uuid())
+  tenantId              String   @map("tenant_id")
+  name                  String
+  venueType             String   @map("venue_type") // HOTEL | RESORT | CLUB | CORPORATE | RESTAURANT | EVENT_SPACE | OTHER
+  address               Json?    // VenueAddress: { zip, street, number, complement, neighborhood, city, state, country }
+  parking               Json?    // VenueParking: { type, averageCost, is24Hours, operatingHours }
+  areas                 Json?    // VenueArea[]: [{ name, capacity, allowsTables, tableCapacity }]
+  techInfrastructure    Json?    @map("tech_infrastructure") // { hasProjector, hasStage, hasAuditorium, hasSoundSystem, hasLighting, otherEquipment }
+  serviceInfrastructure Json?    @map("service_infrastructure") // { hasHotel, hasRestaurant, hasCafe, hasBar, hasPool, otherServices }
+  technicalTeam         Json?    @map("technical_team") // { hasAudioVisual, hasReception, hasRegistration, hasSecurity, hasCleaning, otherTeams }
+  availableMonths       Int[]    @default([]) @map("available_months") // [1,2,3...12]
+  isActive              Boolean  @default(true) @map("is_active")
+  notes                 String?
+  metadata              Json?
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  venueEventTypes EventVenueEventType[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, venueType])
+  @@index([tenantId, isActive])
+  @@map("event_venues")
+}
+
+/// EventVenueEventType - junction table for venue allowed event types
+model EventVenueEventType {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  venueId     String   @map("venue_id")
+  eventTypeId String   @map("event_type_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  venue     EventVenue @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  eventType EventType  @relation(fields: [eventTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([venueId, eventTypeId])
+  @@index([tenantId])
+  @@index([venueId])
+  @@index([eventTypeId])
+  @@map("event_venue_event_types")
+}
+
+// ============================================
+// GOVERNANCE DOMAIN - Working Units
+// ============================================
+
 /// WorkingUnit - Groups and Nuclei for social organization
 model WorkingUnit {
   id            String    @id @default(uuid())

@@ -912,3 +912,314 @@ export class SubscriberBenefitsController {
   }
 }
 
+// ============================================
+// EVENT TYPES CONTROLLER
+// ============================================
+
+@ApiTags('Taxonomy - Event Types')
+@Controller('taxonomy/event-types')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class EventTypesController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new event type' })
+  async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    const existing = await this.prisma.eventType.findUnique({
+      where: { tenantId_name: { tenantId, name: dto.name } },
+    });
+
+    if (existing) {
+      throw new HttpException({ error: 'EVENT_TYPE_EXISTS' }, HttpStatus.CONFLICT);
+    }
+
+    return this.prisma.eventType.create({
+      data: {
+        tenantId,
+        name: dto.name,
+        description: dto.description,
+        isActive: dto.isActive ?? true,
+      },
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List event types' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 25,
+    @Query('search') search?: string,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * size;
+    const where: any = { tenantId };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.eventType.findMany({ where, skip, take: Number(size), orderBy: { name: 'asc' } }),
+      this.prisma.eventType.count({ where }),
+    ]);
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get event type by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const eventType = await this.prisma.eventType.findFirst({ where: { id, tenantId } });
+    if (!eventType) throw new HttpException({ error: 'EVENT_TYPE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    return eventType;
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update event type' })
+  async update(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    const existing = await this.prisma.eventType.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'EVENT_TYPE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Check for name conflict
+    if (dto.name && dto.name !== existing.name) {
+      const nameConflict = await this.prisma.eventType.findUnique({
+        where: { tenantId_name: { tenantId, name: dto.name } },
+      });
+      if (nameConflict) {
+        throw new HttpException({ error: 'EVENT_TYPE_NAME_EXISTS' }, HttpStatus.CONFLICT);
+      }
+    }
+
+    return this.prisma.eventType.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        description: dto.description ?? existing.description,
+        isActive: dto.isActive ?? existing.isActive,
+      },
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete event type' })
+  async delete(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const existing = await this.prisma.eventType.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'EVENT_TYPE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Check if event type is used by venues
+    const usageCount = await this.prisma.eventVenueEventType.count({ where: { eventTypeId: id } });
+    if (usageCount > 0) {
+      throw new HttpException(
+        { error: 'EVENT_TYPE_IN_USE', message: `This event type is used by ${usageCount} venue(s)` },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.prisma.eventType.delete({ where: { id } });
+    return existing;
+  }
+}
+
+// ============================================
+// EVENT VENUES CONTROLLER
+// ============================================
+
+@ApiTags('Taxonomy - Event Venues')
+@Controller('taxonomy/event-venues')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class EventVenuesController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new event venue' })
+  async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    const existing = await this.prisma.eventVenue.findUnique({
+      where: { tenantId_name: { tenantId, name: dto.name } },
+    });
+
+    if (existing) {
+      throw new HttpException({ error: 'EVENT_VENUE_EXISTS' }, HttpStatus.CONFLICT);
+    }
+
+    // Create venue
+    const venue = await this.prisma.eventVenue.create({
+      data: {
+        tenantId,
+        name: dto.name,
+        venueType: dto.venueType || 'OTHER',
+        address: dto.address || {},
+        parking: dto.parking || { type: 'NONE' },
+        areas: dto.areas || [],
+        techInfrastructure: dto.techInfrastructure || {},
+        serviceInfrastructure: dto.serviceInfrastructure || {},
+        technicalTeam: dto.technicalTeam || {},
+        availableMonths: dto.availableMonths || [],
+        isActive: dto.isActive ?? true,
+        notes: dto.notes,
+        metadata: dto.metadata || {},
+      },
+    });
+
+    // Create event type associations
+    if (dto.allowedEventTypeIds?.length > 0) {
+      await this.prisma.eventVenueEventType.createMany({
+        data: dto.allowedEventTypeIds.map((eventTypeId: string) => ({
+          tenantId,
+          venueId: venue.id,
+          eventTypeId,
+        })),
+      });
+    }
+
+    // Return venue with event types
+    return this.getVenueWithEventTypes(venue.id, tenantId);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List event venues' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 25,
+    @Query('search') search?: string,
+    @Query('venueType') venueType?: string,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * size;
+    const where: any = { tenantId };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { notes: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (venueType) where.venueType = venueType;
+
+    const [rawItems, total] = await Promise.all([
+      this.prisma.eventVenue.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: { name: 'asc' },
+        include: {
+          venueEventTypes: {
+            include: { eventType: true },
+          },
+        },
+      }),
+      this.prisma.eventVenue.count({ where }),
+    ]);
+
+    // Transform to include allowedEventTypeIds and allowedEventTypes
+    const items = rawItems.map((venue) => ({
+      ...venue,
+      allowedEventTypeIds: venue.venueEventTypes.map((vet) => vet.eventTypeId),
+      allowedEventTypes: venue.venueEventTypes.map((vet) => vet.eventType),
+      venueEventTypes: undefined,
+    }));
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get event venue by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const venue = await this.getVenueWithEventTypes(id, tenantId);
+    if (!venue) throw new HttpException({ error: 'EVENT_VENUE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    return venue;
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update event venue' })
+  async update(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    const existing = await this.prisma.eventVenue.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'EVENT_VENUE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Check for name conflict
+    if (dto.name && dto.name !== existing.name) {
+      const nameConflict = await this.prisma.eventVenue.findUnique({
+        where: { tenantId_name: { tenantId, name: dto.name } },
+      });
+      if (nameConflict) {
+        throw new HttpException({ error: 'EVENT_VENUE_NAME_EXISTS' }, HttpStatus.CONFLICT);
+      }
+    }
+
+    // Update venue
+    await this.prisma.eventVenue.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        venueType: dto.venueType ?? existing.venueType,
+        address: dto.address ?? existing.address,
+        parking: dto.parking ?? existing.parking,
+        areas: dto.areas ?? existing.areas,
+        techInfrastructure: dto.techInfrastructure ?? existing.techInfrastructure,
+        serviceInfrastructure: dto.serviceInfrastructure ?? existing.serviceInfrastructure,
+        technicalTeam: dto.technicalTeam ?? existing.technicalTeam,
+        availableMonths: dto.availableMonths ?? existing.availableMonths,
+        isActive: dto.isActive ?? existing.isActive,
+        notes: dto.notes ?? existing.notes,
+        metadata: dto.metadata ?? existing.metadata,
+      },
+    });
+
+    // Update event type associations if provided
+    if (dto.allowedEventTypeIds !== undefined) {
+      // Delete existing associations
+      await this.prisma.eventVenueEventType.deleteMany({ where: { venueId: id } });
+
+      // Create new associations
+      if (dto.allowedEventTypeIds.length > 0) {
+        await this.prisma.eventVenueEventType.createMany({
+          data: dto.allowedEventTypeIds.map((eventTypeId: string) => ({
+            tenantId,
+            venueId: id,
+            eventTypeId,
+          })),
+        });
+      }
+    }
+
+    return this.getVenueWithEventTypes(id, tenantId);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete event venue' })
+  async delete(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const existing = await this.prisma.eventVenue.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'EVENT_VENUE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Delete venue (cascades to event type associations)
+    await this.prisma.eventVenue.delete({ where: { id } });
+    return existing;
+  }
+
+  // Helper method to get venue with event types
+  private async getVenueWithEventTypes(id: string, tenantId: string) {
+    const venue = await this.prisma.eventVenue.findFirst({
+      where: { id, tenantId },
+      include: {
+        venueEventTypes: {
+          include: { eventType: true },
+        },
+      },
+    });
+
+    if (!venue) return null;
+
+    return {
+      ...venue,
+      allowedEventTypeIds: venue.venueEventTypes.map((vet) => vet.eventTypeId),
+      allowedEventTypes: venue.venueEventTypes.map((vet) => vet.eventType),
+      venueEventTypes: undefined,
+    };
+  }
+}
+
