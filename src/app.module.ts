@@ -37,6 +37,9 @@ import { NetworkModule } from './domains/network/network.module';
 // Settings Domain
 import { SettingsModule } from './domains/settings';
 
+// Form Studio Domain
+import { FormStudioModule } from './domains/form-studio';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -51,6 +54,7 @@ import { SettingsModule } from './domains/settings';
     AuditModule,
     NetworkModule,
     SettingsModule,
+    FormStudioModule,
   ],
   controllers: [ApprovalsController],
   providers: [

@@ -1354,3 +1354,89 @@ model WorkingUnitMembership {
   @@index([tenantId, status])
   @@map("working_unit_memberships")
 }
+
+// ============================================
+// FORM STUDIO DOMAIN
+// ============================================
+
+/// DataEntryForm - Form definitions for data collection
+model DataEntryForm {
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  formId            String    @unique @map("form_id") // Public form identifier
+  name              String
+  description       String?
+  entityType        String?   @map("entity_type") // EVENT | MEMBER | STRUCTURE | CUSTOM
+  entityId          String?   @map("entity_id") // Links to specific entity if not a template
+  version           String    @default("1.0.0")
+  status            String    @default("DRAFT") // DRAFT | TESTING | PUBLISHED | DEPRECATED
+  layout            Json?     // Grid layout configuration
+  fields            Json      // Array of field definitions
+  validationRules   Json?     @map("validation_rules") // Global validation rules
+  metadata          Json?
+  publishedAt       DateTime? @map("published_at")
+  publishedBy       String?   @map("published_by")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  versions    FormVersion[]
+  submissions FormSubmission[]
+
+  @@unique([tenantId, formId])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, entityType])
+  @@index([tenantId, entityType, entityId])
+  @@map("data_entry_forms")
+}
+
+/// FormVersion - Frozen snapshots of form schemas
+model FormVersion {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  formId      String   @map("form_id")
+  version     String
+  schema      Json     // Frozen snapshot of fields + layout
+  changelog   String?
+  publishedAt DateTime @default(now()) @map("published_at")
+  publishedBy String   @map("published_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  form DataEntryForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@unique([formId, version])
+  @@index([tenantId])
+  @@index([tenantId, formId])
+  @@map("form_versions")
+}
+
+/// FormSubmission - Submitted form data
+model FormSubmission {
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  formId           String    @map("form_id")
+  formVersion      String    @map("form_version")
+  entityType       String?   @map("entity_type") // EVENT | MEMBER | STRUCTURE
+  entityId         String?   @map("entity_id") // Links to specific entity
+  data             Json      // Submitted form data
+  status           String    @default("pending") // pending | validated | processed | error
+  validationErrors Json?     @map("validation_errors")
+  processedAt      DateTime? @map("processed_at")
+  submittedBy      String?   @map("submitted_by")
+  submittedAt      DateTime  @default(now()) @map("submitted_at")
+  metadata         Json?
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  form DataEntryForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, formId])
+  @@index([tenantId, formId, status])
+  @@index([tenantId, entityType, entityId])
+  @@index([submittedAt])
+  @@map("form_submissions")
+}
