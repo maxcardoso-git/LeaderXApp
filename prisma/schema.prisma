@@ -348,6 +348,7 @@ model IdentityUser {
 
   // Relations
   assignments AccessAssignment[]
+  sessions    UserSession[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -434,6 +435,40 @@ model AccessAssignment {
   @@index([tenantId, roleId, status])
   @@index([tenantId, scopeType, scopeId])
   @@map("access_assignments")
+}
+
+/// UserSession - tracks active user login sessions
+model UserSession {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+  userId        String    @map("user_id")
+  deviceType    String?   @map("device_type") // DESKTOP | MOBILE | TABLET | OTHER
+  deviceName    String?   @map("device_name")
+  browser       String?
+  browserVersion String?  @map("browser_version")
+  os            String?
+  osVersion     String?   @map("os_version")
+  ipAddress     String?   @map("ip_address")
+  location      String?   // City, Country
+  userAgent     String?   @map("user_agent")
+  lastActivity  DateTime  @default(now()) @map("last_activity")
+  expiresAt     DateTime? @map("expires_at")
+  status        String    @default("ACTIVE") // ACTIVE | EXPIRED | REVOKED
+  revokedAt     DateTime? @map("revoked_at")
+  revokedReason String?   @map("revoked_reason")
+  metadata      Json?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user IdentityUser @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, userId])
+  @@index([tenantId, status])
+  @@index([tenantId, userId, status])
+  @@index([lastActivity])
+  @@map("user_sessions")
 }
 
 // ============================================

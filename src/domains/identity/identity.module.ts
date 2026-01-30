@@ -44,6 +44,7 @@ import {
 
 // Inbound adapters (controllers)
 import { IdentityController } from './inbound/controllers/identity.controller';
+import { SessionsController } from './inbound/controllers/sessions.controller';
 
 // Cross-domain dependencies (from Points domain)
 import { IdempotencyRepository } from '../points/outbound/repositories/idempotency.repository';
@@ -99,7 +100,7 @@ const useCases = [
 ];
 
 @Module({
-  controllers: [IdentityController],
+  controllers: [IdentityController, SessionsController],
   providers: [
     PrismaService,
     IdempotencyRepository,
