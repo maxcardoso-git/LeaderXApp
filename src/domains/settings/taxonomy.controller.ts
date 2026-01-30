@@ -574,6 +574,8 @@ export class ProgramsController {
         name: dto.name,
         description: dto.description,
         categoryId: dto.categoryId || null,
+        renewalPeriodMonths: dto.renewalPeriodMonths || null,
+        billingPeriod: dto.billingPeriod || null,
         isActive: dto.isActive ?? true,
         metadata: dto.metadata ?? {},
       },
@@ -603,7 +605,8 @@ export class ProgramsController {
     if (categoryId) where.categoryId = categoryId;
     if (isActive !== undefined) where.isActive = isActive === 'true';
 
-    const [items, total] = await Promise.all([
+    const now = new Date();
+    const [rawItems, total] = await Promise.all([
       this.prisma.program.findMany({
         where,
         skip,
@@ -611,6 +614,10 @@ export class ProgramsController {
         orderBy: [{ name: 'asc' }],
         include: {
           pricing: true,
+          priceTables: {
+            where: { isActive: true },
+            orderBy: { startsAt: 'desc' },
+          },
           benefits: {
             include: { benefit: true },
             orderBy: { sortOrder: 'asc' },
@@ -619,6 +626,16 @@ export class ProgramsController {
       }),
       this.prisma.program.count({ where }),
     ]);
+
+    // Add currentPriceTable (active and within date range)
+    const items = rawItems.map((program) => {
+      const currentPriceTable = program.priceTables.find((pt: { startsAt: Date; endsAt: Date | null; isActive: boolean }) => {
+        const startsValid = new Date(pt.startsAt) <= now;
+        const endsValid = !pt.endsAt || new Date(pt.endsAt) >= now;
+        return pt.isActive && startsValid && endsValid;
+      });
+      return { ...program, currentPriceTable };
+    });
 
     return { items, page: Number(page), size: Number(size), total };
   }
@@ -653,6 +670,8 @@ export class ProgramsController {
         name: dto.name ?? existing.name,
         description: dto.description ?? existing.description,
         categoryId: dto.categoryId !== undefined ? dto.categoryId || null : existing.categoryId,
+        renewalPeriodMonths: dto.renewalPeriodMonths !== undefined ? dto.renewalPeriodMonths : existing.renewalPeriodMonths,
+        billingPeriod: dto.billingPeriod !== undefined ? dto.billingPeriod : existing.billingPeriod,
         isActive: dto.isActive ?? existing.isActive,
         metadata: dto.metadata ?? existing.metadata,
       },
@@ -671,12 +690,16 @@ export class ProgramsController {
   }
 
   @Get(':id/full')
-  @ApiOperation({ summary: 'Get program with pricing and benefits' })
+  @ApiOperation({ summary: 'Get program with pricing, price tables, and benefits' })
   async getFullById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const now = new Date();
     const program = await this.prisma.program.findFirst({
       where: { id, tenantId },
       include: {
         pricing: true,
+        priceTables: {
+          orderBy: { startsAt: 'desc' },
+        },
         benefits: {
           include: { benefit: true },
           orderBy: { sortOrder: 'asc' },
@@ -684,6 +707,13 @@ export class ProgramsController {
       },
     });
     if (!program) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Find current active price table
+    const currentPriceTable = program.priceTables.find((pt: { startsAt: Date; endsAt: Date | null; isActive: boolean }) => {
+      const startsValid = new Date(pt.startsAt) <= now;
+      const endsValid = !pt.endsAt || new Date(pt.endsAt) >= now;
+      return pt.isActive && startsValid && endsValid;
+    });
 
     // Check if category has classifications (for benefits eligibility)
     let canHaveBenefits = false;
@@ -694,7 +724,7 @@ export class ProgramsController {
       canHaveBenefits = classificationsCount > 0;
     }
 
-    return { ...program, canHaveBenefits };
+    return { ...program, currentPriceTable, canHaveBenefits };
   }
 
   @Put(':id/pricing')
@@ -775,6 +805,98 @@ export class ProgramsController {
       include: { benefit: true },
       orderBy: { sortOrder: 'asc' },
     });
+  }
+
+  // ============================================
+  // PRICE TABLES ENDPOINTS
+  // ============================================
+
+  @Get(':id/price-tables')
+  @ApiOperation({ summary: 'List price tables for a program' })
+  async listPriceTables(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const program = await this.prisma.program.findFirst({ where: { id, tenantId } });
+    if (!program) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    const now = new Date();
+    const priceTables = await this.prisma.programPriceTable.findMany({
+      where: { programId: id },
+      orderBy: { startsAt: 'desc' },
+    });
+
+    // Mark which one is current
+    return priceTables.map((pt) => {
+      const startsValid = new Date(pt.startsAt) <= now;
+      const endsValid = !pt.endsAt || new Date(pt.endsAt) >= now;
+      const isCurrent = pt.isActive && startsValid && endsValid;
+      return { ...pt, isCurrent };
+    });
+  }
+
+  @Post(':id/price-tables')
+  @ApiOperation({ summary: 'Create a new price table for a program' })
+  async createPriceTable(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    const program = await this.prisma.program.findFirst({ where: { id, tenantId } });
+    if (!program) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    return this.prisma.programPriceTable.create({
+      data: {
+        tenantId,
+        programId: id,
+        name: dto.name || null,
+        monthlyValue: dto.monthlyValue || 0,
+        currency: dto.currency || 'BRL',
+        pointsPerMonth: dto.pointsPerMonth || 0,
+        startsAt: new Date(dto.startsAt),
+        endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
+        isActive: dto.isActive ?? true,
+        metadata: dto.metadata ?? {},
+      },
+    });
+  }
+
+  @Put(':id/price-tables/:priceTableId')
+  @ApiOperation({ summary: 'Update a price table' })
+  async updatePriceTable(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Param('priceTableId') priceTableId: string,
+    @Body() dto: any,
+  ) {
+    const priceTable = await this.prisma.programPriceTable.findFirst({
+      where: { id: priceTableId, programId: id, tenantId },
+    });
+    if (!priceTable) throw new HttpException({ error: 'PRICE_TABLE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    return this.prisma.programPriceTable.update({
+      where: { id: priceTableId },
+      data: {
+        name: dto.name !== undefined ? dto.name : priceTable.name,
+        monthlyValue: dto.monthlyValue ?? priceTable.monthlyValue,
+        currency: dto.currency ?? priceTable.currency,
+        pointsPerMonth: dto.pointsPerMonth ?? priceTable.pointsPerMonth,
+        startsAt: dto.startsAt ? new Date(dto.startsAt) : priceTable.startsAt,
+        endsAt: dto.endsAt !== undefined ? (dto.endsAt ? new Date(dto.endsAt) : null) : priceTable.endsAt,
+        isActive: dto.isActive ?? priceTable.isActive,
+        metadata: dto.metadata ?? priceTable.metadata,
+      },
+    });
+  }
+
+  @Delete(':id/price-tables/:priceTableId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete a price table' })
+  async deletePriceTable(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Param('priceTableId') priceTableId: string,
+  ) {
+    const priceTable = await this.prisma.programPriceTable.findFirst({
+      where: { id: priceTableId, programId: id, tenantId },
+    });
+    if (!priceTable) throw new HttpException({ error: 'PRICE_TABLE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    await this.prisma.programPriceTable.delete({ where: { id: priceTableId } });
+    return priceTable;
   }
 }
 
