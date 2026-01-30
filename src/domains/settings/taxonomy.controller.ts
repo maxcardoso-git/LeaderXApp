@@ -1450,3 +1450,114 @@ export class TableNamesController {
   }
 }
 
+// ============================================
+// AVATARS CONTROLLER
+// ============================================
+
+@ApiTags('Taxonomy - Avatars')
+@Controller('taxonomy/avatars')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class AvatarsController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new avatar' })
+  async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    const code = dto.code?.toLowerCase().replace(/\s+/g, '_');
+
+    const existing = await this.prisma.participantAvatar.findUnique({
+      where: { tenantId_code: { tenantId, code } },
+    });
+
+    if (existing) {
+      throw new HttpException({ error: 'AVATAR_CODE_EXISTS' }, HttpStatus.CONFLICT);
+    }
+
+    return this.prisma.participantAvatar.create({
+      data: {
+        tenantId,
+        code,
+        name: dto.name,
+        emoji: dto.emoji,
+        color: dto.color,
+        avatarUrl: dto.avatarUrl,
+        isDefault: dto.isDefault ?? false,
+        displayOrder: dto.displayOrder,
+      },
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List avatars' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 100,
+    @Query('search') search?: string,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * size;
+    const where: any = { tenantId };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search.toLowerCase(), mode: 'insensitive' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.participantAvatar.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.participantAvatar.count({ where }),
+    ]);
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get avatar by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const avatar = await this.prisma.participantAvatar.findFirst({ where: { id, tenantId } });
+    if (!avatar) throw new HttpException({ error: 'AVATAR_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    return avatar;
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update avatar' })
+  async update(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    const existing = await this.prisma.participantAvatar.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'AVATAR_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    return this.prisma.participantAvatar.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        emoji: dto.emoji ?? existing.emoji,
+        color: dto.color ?? existing.color,
+        avatarUrl: dto.avatarUrl !== undefined ? dto.avatarUrl : existing.avatarUrl,
+        displayOrder: dto.displayOrder !== undefined ? dto.displayOrder : existing.displayOrder,
+      },
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete avatar' })
+  async delete(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const existing = await this.prisma.participantAvatar.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'AVATAR_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Don't allow deleting default avatars
+    if (existing.isDefault) {
+      throw new HttpException({ error: 'CANNOT_DELETE_DEFAULT_AVATAR' }, HttpStatus.BAD_REQUEST);
+    }
+
+    await this.prisma.participantAvatar.delete({ where: { id } });
+    return existing;
+  }
+}
+

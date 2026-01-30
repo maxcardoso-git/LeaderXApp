@@ -1193,6 +1193,26 @@ model TableName {
   @@map("table_names")
 }
 
+/// ParticipantAvatar - avatar types for event participants
+model ParticipantAvatar {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  code         String
+  name         String
+  emoji        String
+  color        String
+  avatarUrl    String?  @map("avatar_url")
+  isDefault    Boolean  @default(false) @map("is_default")
+  displayOrder Int?     @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, displayOrder])
+  @@map("participant_avatars")
+}
+
 /// Supplier - external suppliers/vendors
 model Supplier {
   id            String   @id @default(uuid())
