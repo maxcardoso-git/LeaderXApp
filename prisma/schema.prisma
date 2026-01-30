@@ -1177,6 +1177,22 @@ model Cycle {
   @@map("cycles")
 }
 
+/// TableName - templates for event table names
+model TableName {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  name            String
+  defaultCapacity Int?     @map("default_capacity")
+  displayOrder    Int?     @map("display_order")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, displayOrder])
+  @@map("table_names")
+}
+
 /// Supplier - external suppliers/vendors
 model Supplier {
   id            String   @id @default(uuid())

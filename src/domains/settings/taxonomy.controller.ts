@@ -1345,3 +1345,108 @@ export class EventVenuesController {
   }
 }
 
+// ============================================
+// TABLE NAMES CONTROLLER
+// ============================================
+
+@ApiTags('Taxonomy - Table Names')
+@Controller('taxonomy/table-names')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class TableNamesController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new table name' })
+  async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    const existing = await this.prisma.tableName.findUnique({
+      where: { tenantId_name: { tenantId, name: dto.name } },
+    });
+
+    if (existing) {
+      throw new HttpException({ error: 'TABLE_NAME_EXISTS' }, HttpStatus.CONFLICT);
+    }
+
+    return this.prisma.tableName.create({
+      data: {
+        tenantId,
+        name: dto.name,
+        defaultCapacity: dto.defaultCapacity,
+        displayOrder: dto.displayOrder,
+      },
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List table names' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 100,
+    @Query('search') search?: string,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * size;
+    const where: any = { tenantId };
+
+    if (search) {
+      where.name = { contains: search, mode: 'insensitive' };
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.tableName.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.tableName.count({ where }),
+    ]);
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get table name by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const tableName = await this.prisma.tableName.findFirst({ where: { id, tenantId } });
+    if (!tableName) throw new HttpException({ error: 'TABLE_NAME_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    return tableName;
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update table name' })
+  async update(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    const existing = await this.prisma.tableName.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'TABLE_NAME_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Check for name conflict if name is being changed
+    if (dto.name && dto.name !== existing.name) {
+      const nameConflict = await this.prisma.tableName.findUnique({
+        where: { tenantId_name: { tenantId, name: dto.name } },
+      });
+      if (nameConflict) {
+        throw new HttpException({ error: 'TABLE_NAME_EXISTS' }, HttpStatus.CONFLICT);
+      }
+    }
+
+    return this.prisma.tableName.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        defaultCapacity: dto.defaultCapacity !== undefined ? dto.defaultCapacity : existing.defaultCapacity,
+        displayOrder: dto.displayOrder !== undefined ? dto.displayOrder : existing.displayOrder,
+      },
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete table name' })
+  async delete(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const existing = await this.prisma.tableName.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'TABLE_NAME_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    await this.prisma.tableName.delete({ where: { id } });
+    return existing;
+  }
+}
+

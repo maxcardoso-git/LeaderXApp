@@ -44,6 +44,18 @@ export interface EventRepositoryPort {
     event: EventAggregate,
     ctx?: TransactionContext,
   ): Promise<void>;
+
+  delete(
+    tenantId: string,
+    eventId: string,
+    ctx?: TransactionContext,
+  ): Promise<void>;
+
+  hasReservations(
+    tenantId: string,
+    eventId: string,
+    ctx?: TransactionContext,
+  ): Promise<boolean>;
 }
 
 export const EVENT_REPOSITORY = Symbol('EVENT_REPOSITORY');

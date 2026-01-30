@@ -390,6 +390,36 @@ export class EventRepository implements EventRepositoryPort {
     }
   }
 
+  async delete(
+    tenantId: string,
+    eventId: string,
+    ctx?: TransactionContext,
+  ): Promise<void> {
+    const client = this.getClient(ctx) as typeof this.prisma;
+
+    // Delete in correct order due to foreign keys
+    await client.eventSeat.deleteMany({ where: { eventId, tenantId } });
+    await client.eventTable.deleteMany({ where: { eventId, tenantId } });
+    await client.eventPhase.deleteMany({ where: { eventId, tenantId } });
+    await client.eventPolicyBinding.deleteMany({ where: { eventId, tenantId } });
+    await client.event.delete({ where: { id: eventId } });
+  }
+
+  async hasReservations(
+    tenantId: string,
+    eventId: string,
+    ctx?: TransactionContext,
+  ): Promise<boolean> {
+    const client = this.getClient(ctx) as typeof this.prisma;
+
+    // Check if there are any reservations for this event
+    const count = await client.reservation.count({
+      where: { tenantId, eventId },
+    });
+
+    return count > 0;
+  }
+
   private toDomain(record: {
     id: string;
     tenantId: string;

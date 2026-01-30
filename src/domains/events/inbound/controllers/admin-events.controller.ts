@@ -10,7 +10,7 @@ import {
   EventPolicyBindingResponseDto, PaginatedResponseDto,
 } from '../dtos';
 import {
-  CreateEventUseCase, UpdateEventUseCase, ListEventsUseCase,
+  CreateEventUseCase, UpdateEventUseCase, ListEventsUseCase, DeleteEventUseCase,
   PublishEventUseCase, ActivateEventUseCase, CloseEventUseCase, CancelEventUseCase,
   AddEventPhaseUseCase, UpdateEventPhaseUseCase, RemoveEventPhaseUseCase,
   AddEventTableUseCase, UpdateEventTableUseCase, RemoveEventTableUseCase,
@@ -31,6 +31,7 @@ export class AdminEventsController {
     private readonly getEventDetails: GetEventDetailsUseCase,
     private readonly createEvent: CreateEventUseCase,
     private readonly updateEvent: UpdateEventUseCase,
+    private readonly deleteEvent: DeleteEventUseCase,
     private readonly publishEvent: PublishEventUseCase,
     private readonly activateEvent: ActivateEventUseCase,
     private readonly closeEvent: CloseEventUseCase,
@@ -181,6 +182,17 @@ export class AdminEventsController {
       actorId,
     });
     return this.toEventResponse(event);
+  }
+
+  @Delete(':eventId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete an event' })
+  async delete(
+    @Headers('x-tenant-id') tenantId: string,
+    @Headers('x-actor-id') actorId: string,
+    @Param('eventId') eventId: string,
+  ): Promise<void> {
+    await this.deleteEvent.execute({ tenantId, eventId, actorId });
   }
 
   @Post(':eventId/publish')
