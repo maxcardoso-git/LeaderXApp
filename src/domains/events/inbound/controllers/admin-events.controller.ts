@@ -10,13 +10,14 @@ import {
   EventPolicyBindingResponseDto, PaginatedResponseDto,
 } from '../dtos';
 import {
-  CreateEventUseCase, UpdateEventUseCase,
+  CreateEventUseCase, UpdateEventUseCase, ListEventsUseCase,
   PublishEventUseCase, ActivateEventUseCase, CloseEventUseCase, CancelEventUseCase,
   AddEventPhaseUseCase, UpdateEventPhaseUseCase, RemoveEventPhaseUseCase,
   AddEventTableUseCase, UpdateEventTableUseCase, RemoveEventTableUseCase,
   AddEventSeatUseCase, RemoveEventSeatUseCase,
   BindPolicyUseCase, UnbindPolicyUseCase,
 } from '../../application/usecases/admin';
+import { GetEventDetailsUseCase } from '../../application/usecases/public';
 import { EventAggregate } from '../../domain/aggregates';
 
 @ApiTags('Admin Events')
@@ -26,6 +27,8 @@ import { EventAggregate } from '../../domain/aggregates';
 @ApiHeader({ name: 'Idempotency-Key', required: false })
 export class AdminEventsController {
   constructor(
+    private readonly listEvents: ListEventsUseCase,
+    private readonly getEventDetails: GetEventDetailsUseCase,
     private readonly createEvent: CreateEventUseCase,
     private readonly updateEvent: UpdateEventUseCase,
     private readonly publishEvent: PublishEventUseCase,
@@ -59,6 +62,79 @@ export class AdminEventsController {
       createdAt: event.createdAt.toISOString(),
       updatedAt: event.updatedAt.toISOString(),
     };
+  }
+
+  private toDetailResponse(event: EventAggregate): EventDetailResponseDto {
+    const phases: EventPhaseResponseDto[] = event.phases.map((p) => ({
+      id: p.id,
+      eventId: event.id,
+      name: p.name,
+      startsAt: p.startsAt.toISOString(),
+      endsAt: p.endsAt.toISOString(),
+      sortOrder: p.sortOrder,
+      metadata: p.metadata,
+      createdAt: p.createdAt.toISOString(),
+    }));
+
+    const tables: EventTableResponseDto[] = event.tables.map((t) => ({
+      id: t.id,
+      eventId: event.id,
+      name: t.name,
+      capacity: t.capacity,
+      seatsCount: t.seats.length,
+      metadata: t.metadata,
+      createdAt: t.createdAt.toISOString(),
+    }));
+
+    const policyBindings: EventPolicyBindingResponseDto[] = event.policyBindings.map((b) => ({
+      id: b.id,
+      eventId: event.id,
+      policyCode: b.policyCode,
+      scope: b.scope,
+      metadata: b.metadata,
+      createdAt: b.createdAt.toISOString(),
+    }));
+
+    return {
+      ...this.toEventResponse(event),
+      phases,
+      tables,
+      policyBindings,
+    };
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List all events' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query() query: ListEventsQueryDto,
+  ): Promise<PaginatedResponseDto<EventResponseDto>> {
+    const result = await this.listEvents.execute({
+      tenantId,
+      status: query.status,
+      visibility: query.visibility,
+      search: query.search,
+      startsAfter: query.startsAfter ? new Date(query.startsAfter) : undefined,
+      startsBefore: query.startsBefore ? new Date(query.startsBefore) : undefined,
+      pagination: { page: query.page ?? 1, size: query.size ?? 25 },
+    });
+
+    return {
+      items: result.items.map((e) => this.toEventResponse(e)),
+      page: result.page,
+      size: result.size,
+      total: result.total,
+    };
+  }
+
+  @Get(':eventId')
+  @ApiOperation({ summary: 'Get event details' })
+  async getDetails(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('eventId') eventId: string,
+  ): Promise<EventDetailResponseDto> {
+    const event = await this.getEventDetails.execute({ tenantId, eventId });
+    return this.toDetailResponse(event);
   }
 
   @Post()

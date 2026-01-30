@@ -16,6 +16,7 @@ import { EventRepository, ReservationReadAdapter } from './outbound/repositories
 import {
   CreateEventUseCase,
   UpdateEventUseCase,
+  ListEventsUseCase,
   PublishEventUseCase,
   ActivateEventUseCase,
   CloseEventUseCase,
@@ -58,6 +59,7 @@ const repositories = [
 const adminUseCases = [
   CreateEventUseCase,
   UpdateEventUseCase,
+  ListEventsUseCase,
   PublishEventUseCase,
   ActivateEventUseCase,
   CloseEventUseCase,
