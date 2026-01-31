@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
 import { PrismaService } from '@infrastructure/persistence/prisma.service';
-import { IsNumber, Min } from 'class-validator';
+import { IsNumber, Min, IsString, IsOptional } from 'class-validator';
 
 // ============================================
 // Reorder DTO
@@ -23,6 +23,33 @@ class ReorderStageDto {
   @IsNumber()
   @Min(0)
   newOrder: number;
+}
+
+class AddTransitionDto {
+  @IsString()
+  toStageId: string;
+}
+
+class AddFormRuleDto {
+  @IsString()
+  @IsOptional()
+  formDefinitionId?: string;
+
+  @IsString()
+  @IsOptional()
+  externalFormId?: string;
+
+  @IsString()
+  @IsOptional()
+  externalFormName?: string;
+
+  @IsString()
+  @IsOptional()
+  defaultFormStatus?: string;
+
+  @IsString()
+  @IsOptional()
+  uniqueKeyFieldId?: string;
 }
 
 // ============================================
@@ -478,6 +505,12 @@ export class StagesController {
         triggers: {
           include: { conditions: true },
         },
+        fromTransitions: {
+          include: { toStage: { select: { id: true, name: true, color: true } } },
+        },
+        toTransitions: {
+          include: { fromStage: { select: { id: true, name: true, color: true } } },
+        },
         _count: {
           select: { fromTransitions: true, toTransitions: true },
         },
@@ -669,7 +702,7 @@ export class StagesController {
     @Param('pipelineId') pipelineId: string,
     @Param('versionId') versionId: string,
     @Param('stageId') stageId: string,
-    @Body() dto: { toStageId: string },
+    @Body() dto: AddTransitionDto,
   ) {
     const version = await this.prisma.plmPipelineVersion.findFirst({
       where: { id: versionId, pipelineId, tenantId },
@@ -748,7 +781,7 @@ export class StagesController {
     @Param('pipelineId') pipelineId: string,
     @Param('versionId') versionId: string,
     @Param('stageId') stageId: string,
-    @Body() dto: any,
+    @Body() dto: AddFormRuleDto,
   ) {
     const version = await this.prisma.plmPipelineVersion.findFirst({
       where: { id: versionId, pipelineId, tenantId },
