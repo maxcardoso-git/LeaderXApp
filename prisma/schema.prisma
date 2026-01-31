@@ -1217,6 +1217,9 @@ model ParticipantAvatar {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  // Relations
+  stageAvatarRules PlmStageAvatarRule[]
+
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([tenantId, displayOrder])
@@ -1611,6 +1614,7 @@ model PlmStage {
   cards             PlmCard[]
   moveHistoryFrom   PlmCardMoveHistory[]     @relation("FromStageHistory")
   moveHistoryTo     PlmCardMoveHistory[]     @relation("ToStageHistory")
+  avatarRules       PlmStageAvatarRule[]
 
   @@unique([pipelineVersionId, stageOrder])
   @@index([tenantId])
@@ -1931,4 +1935,27 @@ model PlmPipelinePermission {
   @@index([pipelineId])
   @@index([groupId])
   @@map("plm_pipeline_permissions")
+}
+
+/// PlmStageAvatarRule - avatar requirements for stage actions and card progression
+/// Each stage can have multiple avatars with approval rules for advancing cards
+model PlmStageAvatarRule {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  stageId      String   @map("stage_id")
+  avatarId     String   @map("avatar_id")
+  approvalRule String   @default("ONE_MEMBER") @map("approval_rule") // ONE_MEMBER, HALF_MEMBERS, MAJORITY
+  ruleOrder    Int      @default(0) @map("rule_order") // Order of avatar rules for the stage
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  stage  PlmStage          @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  avatar ParticipantAvatar @relation(fields: [avatarId], references: [id], onDelete: Cascade)
+
+  @@unique([stageId, avatarId])
+  @@index([tenantId])
+  @@index([stageId])
+  @@index([avatarId])
+  @@map("plm_stage_avatar_rules")
 }

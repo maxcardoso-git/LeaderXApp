@@ -53,6 +53,30 @@ class AddFormRuleDto {
   uniqueKeyFieldId?: string;
 }
 
+class AddAvatarRuleDto {
+  @IsString()
+  @IsNotEmpty()
+  avatarId: string;
+
+  @IsString()
+  @IsOptional()
+  approvalRule?: string; // ONE_MEMBER, HALF_MEMBERS, MAJORITY
+
+  @IsNumber()
+  @IsOptional()
+  ruleOrder?: number;
+}
+
+class UpdateAvatarRuleDto {
+  @IsString()
+  @IsOptional()
+  approvalRule?: string;
+
+  @IsNumber()
+  @IsOptional()
+  ruleOrder?: number;
+}
+
 // ============================================
 // DTOs & Types
 // ============================================
@@ -506,6 +530,12 @@ export class StagesController {
         triggers: {
           include: { conditions: true },
         },
+        avatarRules: {
+          orderBy: { ruleOrder: 'asc' },
+          include: {
+            avatar: { select: { id: true, code: true, name: true, emoji: true, color: true } },
+          },
+        },
         fromTransitions: {
           include: { toStage: { select: { id: true, name: true, color: true } } },
         },
@@ -533,6 +563,12 @@ export class StagesController {
         formAttachRules: true,
         triggers: {
           include: { conditions: true },
+        },
+        avatarRules: {
+          orderBy: { ruleOrder: 'asc' },
+          include: {
+            avatar: { select: { id: true, code: true, name: true, emoji: true, color: true } },
+          },
         },
         fromTransitions: {
           include: { toStage: { select: { id: true, name: true, color: true } } },
@@ -960,6 +996,151 @@ export class StagesController {
 
     await this.prisma.plmStageTrigger.delete({ where: { id: triggerId } });
     return trigger;
+  }
+
+  // ============================================
+  // AVATAR RULES
+  // ============================================
+
+  @Get(':stageId/avatar-rules')
+  @ApiOperation({ summary: 'Get avatar rules for a stage' })
+  async getAvatarRules(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('pipelineId') pipelineId: string,
+    @Param('versionId') versionId: string,
+    @Param('stageId') stageId: string,
+  ) {
+    const stage = await this.prisma.plmStage.findFirst({
+      where: { id: stageId, pipelineVersionId: versionId, tenantId },
+    });
+    if (!stage) throw new HttpException({ error: 'STAGE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    return this.prisma.plmStageAvatarRule.findMany({
+      where: { stageId },
+      orderBy: { ruleOrder: 'asc' },
+      include: {
+        avatar: { select: { id: true, code: true, name: true, emoji: true, color: true } },
+      },
+    });
+  }
+
+  @Post(':stageId/avatar-rules')
+  @ApiOperation({ summary: 'Add avatar rule to stage' })
+  async addAvatarRule(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('pipelineId') pipelineId: string,
+    @Param('versionId') versionId: string,
+    @Param('stageId') stageId: string,
+    @Body() dto: AddAvatarRuleDto,
+  ) {
+    const version = await this.prisma.plmPipelineVersion.findFirst({
+      where: { id: versionId, pipelineId, tenantId },
+    });
+    if (!version) throw new HttpException({ error: 'VERSION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    if (version.versionStatus !== 'DRAFT') {
+      throw new HttpException({ error: 'VERSION_NOT_EDITABLE' }, HttpStatus.BAD_REQUEST);
+    }
+
+    const stage = await this.prisma.plmStage.findFirst({
+      where: { id: stageId, pipelineVersionId: versionId },
+    });
+    if (!stage) throw new HttpException({ error: 'STAGE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Validate avatar exists
+    const avatar = await this.prisma.participantAvatar.findFirst({
+      where: { id: dto.avatarId, tenantId },
+    });
+    if (!avatar) throw new HttpException({ error: 'AVATAR_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Check if avatar rule already exists for this stage
+    const existing = await this.prisma.plmStageAvatarRule.findFirst({
+      where: { stageId, avatarId: dto.avatarId },
+    });
+    if (existing) {
+      throw new HttpException({ error: 'AVATAR_RULE_EXISTS' }, HttpStatus.BAD_REQUEST);
+    }
+
+    // Get next rule order
+    const maxOrder = await this.prisma.plmStageAvatarRule.aggregate({
+      where: { stageId },
+      _max: { ruleOrder: true },
+    });
+    const nextOrder = (maxOrder._max.ruleOrder || 0) + 1;
+
+    return this.prisma.plmStageAvatarRule.create({
+      data: {
+        tenantId,
+        stageId,
+        avatarId: dto.avatarId,
+        approvalRule: dto.approvalRule || 'ONE_MEMBER',
+        ruleOrder: dto.ruleOrder ?? nextOrder,
+      },
+      include: {
+        avatar: { select: { id: true, code: true, name: true, emoji: true, color: true } },
+      },
+    });
+  }
+
+  @Put(':stageId/avatar-rules/:ruleId')
+  @ApiOperation({ summary: 'Update avatar rule' })
+  async updateAvatarRule(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('pipelineId') pipelineId: string,
+    @Param('versionId') versionId: string,
+    @Param('stageId') stageId: string,
+    @Param('ruleId') ruleId: string,
+    @Body() dto: UpdateAvatarRuleDto,
+  ) {
+    const version = await this.prisma.plmPipelineVersion.findFirst({
+      where: { id: versionId, pipelineId, tenantId },
+    });
+    if (!version) throw new HttpException({ error: 'VERSION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    if (version.versionStatus !== 'DRAFT') {
+      throw new HttpException({ error: 'VERSION_NOT_EDITABLE' }, HttpStatus.BAD_REQUEST);
+    }
+
+    const rule = await this.prisma.plmStageAvatarRule.findFirst({
+      where: { id: ruleId, stageId, tenantId },
+    });
+    if (!rule) throw new HttpException({ error: 'AVATAR_RULE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    return this.prisma.plmStageAvatarRule.update({
+      where: { id: ruleId },
+      data: {
+        approvalRule: dto.approvalRule ?? rule.approvalRule,
+        ruleOrder: dto.ruleOrder ?? rule.ruleOrder,
+      },
+      include: {
+        avatar: { select: { id: true, code: true, name: true, emoji: true, color: true } },
+      },
+    });
+  }
+
+  @Delete(':stageId/avatar-rules/:ruleId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove avatar rule' })
+  async removeAvatarRule(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('pipelineId') pipelineId: string,
+    @Param('versionId') versionId: string,
+    @Param('stageId') stageId: string,
+    @Param('ruleId') ruleId: string,
+  ) {
+    const version = await this.prisma.plmPipelineVersion.findFirst({
+      where: { id: versionId, pipelineId, tenantId },
+    });
+    if (!version) throw new HttpException({ error: 'VERSION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    if (version.versionStatus !== 'DRAFT') {
+      throw new HttpException({ error: 'VERSION_NOT_EDITABLE' }, HttpStatus.BAD_REQUEST);
+    }
+
+    const rule = await this.prisma.plmStageAvatarRule.findFirst({
+      where: { id: ruleId, stageId, tenantId },
+    });
+    if (!rule) throw new HttpException({ error: 'AVATAR_RULE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    await this.prisma.plmStageAvatarRule.delete({ where: { id: ruleId } });
+    return rule;
   }
 }
 
