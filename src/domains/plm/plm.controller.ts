@@ -705,6 +705,7 @@ export class StagesController {
     @Param('stageId') stageId: string,
     @Body() dto: AddTransitionDto,
   ) {
+    console.log('[ADD_TRANSITION] Starting:', { tenantId, pipelineId, versionId, stageId, dto });
     const version = await this.prisma.plmPipelineVersion.findFirst({
       where: { id: versionId, pipelineId, tenantId },
     });
