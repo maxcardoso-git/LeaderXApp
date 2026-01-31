@@ -735,3 +735,328 @@ export class FieldTypesController {
     ];
   }
 }
+
+// ============================================
+// DATA SOURCES CONTROLLER
+// ============================================
+
+@ApiTags('Form Studio - Data Sources')
+@Controller('form-studio/data-sources')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class DataSourcesController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new data source' })
+  async create(
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() dto: { name: string; description?: string; formDefinitionId?: string },
+  ) {
+    // If formDefinitionId is provided, verify it exists and is not already connected
+    if (dto.formDefinitionId) {
+      const form = await this.prisma.dataEntryForm.findFirst({
+        where: { id: dto.formDefinitionId, tenantId },
+      });
+      if (!form) {
+        throw new HttpException({ error: 'FORM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+      }
+
+      // Check if form is already connected to another data source
+      const existingConnection = await this.prisma.formDataSource.findFirst({
+        where: { formDefinitionId: dto.formDefinitionId, tenantId },
+      });
+      if (existingConnection) {
+        throw new HttpException(
+          { error: 'FORM_ALREADY_CONNECTED', message: 'This form is already connected to another data source' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+
+    return this.prisma.formDataSource.create({
+      data: {
+        tenantId,
+        name: dto.name,
+        description: dto.description || null,
+        formDefinitionId: dto.formDefinitionId || null,
+      },
+      include: {
+        _count: { select: { entries: true } },
+      },
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List data sources' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 25,
+    @Query('search') search?: string,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * size;
+    const where: any = { tenantId };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.formDataSource.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: [{ updatedAt: 'desc' }],
+        include: {
+          _count: { select: { entries: true } },
+        },
+      }),
+      this.prisma.formDataSource.count({ where }),
+    ]);
+
+    // Fetch connected form info for each data source
+    const formIds = items.map((ds) => ds.formDefinitionId).filter(Boolean) as string[];
+    const forms = formIds.length > 0
+      ? await this.prisma.dataEntryForm.findMany({
+          where: { id: { in: formIds } },
+          select: { id: true, formId: true, name: true },
+        })
+      : [];
+
+    const formsMap = new Map(forms.map((f) => [f.id, f]));
+
+    const enrichedItems = items.map((ds) => ({
+      ...ds,
+      entryCount: ds._count.entries,
+      form: ds.formDefinitionId ? formsMap.get(ds.formDefinitionId) || null : null,
+    }));
+
+    return { items: enrichedItems, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get data source by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const dataSource = await this.prisma.formDataSource.findFirst({
+      where: { id, tenantId },
+      include: {
+        _count: { select: { entries: true } },
+      },
+    });
+    if (!dataSource) {
+      throw new HttpException({ error: 'DATA_SOURCE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    // Get connected form info
+    let form = null;
+    if (dataSource.formDefinitionId) {
+      form = await this.prisma.dataEntryForm.findFirst({
+        where: { id: dataSource.formDefinitionId },
+        select: { id: true, formId: true, name: true },
+      });
+    }
+
+    return {
+      ...dataSource,
+      entryCount: dataSource._count.entries,
+      form,
+    };
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update data source' })
+  async update(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: { name?: string; description?: string; formDefinitionId?: string },
+  ) {
+    const existing = await this.prisma.formDataSource.findFirst({ where: { id, tenantId } });
+    if (!existing) {
+      throw new HttpException({ error: 'DATA_SOURCE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    // If changing formDefinitionId, verify new form exists and is not connected elsewhere
+    if (dto.formDefinitionId !== undefined && dto.formDefinitionId !== existing.formDefinitionId) {
+      if (dto.formDefinitionId) {
+        const form = await this.prisma.dataEntryForm.findFirst({
+          where: { id: dto.formDefinitionId, tenantId },
+        });
+        if (!form) {
+          throw new HttpException({ error: 'FORM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+        }
+
+        const existingConnection = await this.prisma.formDataSource.findFirst({
+          where: { formDefinitionId: dto.formDefinitionId, tenantId, NOT: { id } },
+        });
+        if (existingConnection) {
+          throw new HttpException(
+            { error: 'FORM_ALREADY_CONNECTED', message: 'This form is already connected to another data source' },
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+      }
+    }
+
+    const updated = await this.prisma.formDataSource.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        description: dto.description !== undefined ? dto.description : existing.description,
+        formDefinitionId: dto.formDefinitionId !== undefined ? (dto.formDefinitionId || null) : existing.formDefinitionId,
+      },
+      include: {
+        _count: { select: { entries: true } },
+      },
+    });
+
+    // Get connected form info
+    let form = null;
+    if (updated.formDefinitionId) {
+      form = await this.prisma.dataEntryForm.findFirst({
+        where: { id: updated.formDefinitionId },
+        select: { id: true, formId: true, name: true },
+      });
+    }
+
+    return {
+      ...updated,
+      entryCount: updated._count.entries,
+      form,
+    };
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete data source' })
+  async delete(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const existing = await this.prisma.formDataSource.findFirst({
+      where: { id, tenantId },
+      include: { _count: { select: { entries: true } } },
+    });
+    if (!existing) {
+      throw new HttpException({ error: 'DATA_SOURCE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    // Check for entries
+    if (existing._count.entries > 0) {
+      throw new HttpException(
+        { error: 'DATA_SOURCE_HAS_ENTRIES', message: `Data source has ${existing._count.entries} entry(ies). Delete entries first.` },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.prisma.formDataSource.delete({ where: { id } });
+    return existing;
+  }
+
+  // ============================================
+  // ENTRIES ENDPOINTS
+  // ============================================
+
+  @Get(':id/entries')
+  @ApiOperation({ summary: 'Get entries for a data source' })
+  async getEntries(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Query('page') page = 1,
+    @Query('size') size = 20,
+  ): Promise<PaginatedResponse<any>> {
+    const dataSource = await this.prisma.formDataSource.findFirst({ where: { id, tenantId } });
+    if (!dataSource) {
+      throw new HttpException({ error: 'DATA_SOURCE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    const skip = (page - 1) * size;
+    const where = { dataSourceId: id };
+
+    const [items, total] = await Promise.all([
+      this.prisma.formDataSourceEntry.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: [{ submittedAt: 'desc' }],
+      }),
+      this.prisma.formDataSourceEntry.count({ where }),
+    ]);
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id/entries/:entryId')
+  @ApiOperation({ summary: 'Get entry by ID' })
+  async getEntryById(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Param('entryId') entryId: string,
+  ) {
+    const entry = await this.prisma.formDataSourceEntry.findFirst({
+      where: { id: entryId, dataSourceId: id, tenantId },
+    });
+    if (!entry) {
+      throw new HttpException({ error: 'ENTRY_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+    return entry;
+  }
+
+  @Post(':id/entries')
+  @ApiOperation({ summary: 'Create entry in data source' })
+  async createEntry(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: { data: any; submittedBy?: string; submittedByName?: string },
+  ) {
+    const dataSource = await this.prisma.formDataSource.findFirst({ where: { id, tenantId } });
+    if (!dataSource) {
+      throw new HttpException({ error: 'DATA_SOURCE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    if (!dataSource.formDefinitionId) {
+      throw new HttpException(
+        { error: 'NO_FORM_CONNECTED', message: 'Data source has no form connected' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Get form to get current version
+    const form = await this.prisma.dataEntryForm.findFirst({
+      where: { id: dataSource.formDefinitionId },
+    });
+    if (!form) {
+      throw new HttpException({ error: 'FORM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    return this.prisma.formDataSourceEntry.create({
+      data: {
+        tenantId,
+        dataSourceId: id,
+        formDefinitionId: dataSource.formDefinitionId,
+        formVersion: form.version,
+        data: dto.data,
+        submittedBy: dto.submittedBy || null,
+        submittedByName: dto.submittedByName || null,
+      },
+    });
+  }
+
+  @Delete(':id/entries/:entryId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete entry' })
+  async deleteEntry(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Param('entryId') entryId: string,
+  ) {
+    const entry = await this.prisma.formDataSourceEntry.findFirst({
+      where: { id: entryId, dataSourceId: id, tenantId },
+    });
+    if (!entry) {
+      throw new HttpException({ error: 'ENTRY_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    await this.prisma.formDataSourceEntry.delete({ where: { id: entryId } });
+    return entry;
+  }
+}

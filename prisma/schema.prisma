@@ -1487,6 +1487,49 @@ model FormSubmission {
   @@map("form_submissions")
 }
 
+/// FormDataSource - Data source containers for form entries
+model FormDataSource {
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  name             String
+  description      String?
+  formDefinitionId String?   @unique @map("form_definition_id") // Links to DataEntryForm (one-to-one)
+  createdBy        String?   @map("created_by")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  entries FormDataSourceEntry[]
+
+  @@index([tenantId])
+  @@index([tenantId, formDefinitionId])
+  @@map("form_data_sources")
+}
+
+/// FormDataSourceEntry - Individual entries in a data source
+model FormDataSourceEntry {
+  id               String    @id @default(uuid())
+  tenantId         String    @map("tenant_id")
+  dataSourceId     String    @map("data_source_id")
+  formDefinitionId String    @map("form_definition_id")
+  formVersion      String    @map("form_version")
+  data             Json      // Submitted form data
+  submittedBy      String?   @map("submitted_by")
+  submittedByName  String?   @map("submitted_by_name")
+  submittedAt      DateTime  @default(now()) @map("submitted_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  dataSource FormDataSource @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, dataSourceId])
+  @@index([tenantId, formDefinitionId])
+  @@index([submittedAt])
+  @@map("form_data_source_entries")
+}
+
 // ============================================
 // PLM DOMAIN - Pipeline Lifecycle Manager
 // ============================================
