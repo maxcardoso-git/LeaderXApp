@@ -1370,6 +1370,8 @@ export class TableNamesController {
       data: {
         tenantId,
         name: dto.name,
+        icon: dto.icon,
+        color: dto.color,
         defaultCapacity: dto.defaultCapacity,
         displayOrder: dto.displayOrder,
       },
@@ -1432,6 +1434,8 @@ export class TableNamesController {
       where: { id },
       data: {
         name: dto.name ?? existing.name,
+        icon: dto.icon !== undefined ? dto.icon : existing.icon,
+        color: dto.color !== undefined ? dto.color : existing.color,
         defaultCapacity: dto.defaultCapacity !== undefined ? dto.defaultCapacity : existing.defaultCapacity,
         displayOrder: dto.displayOrder !== undefined ? dto.displayOrder : existing.displayOrder,
       },
