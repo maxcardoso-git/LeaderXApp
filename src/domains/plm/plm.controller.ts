@@ -599,6 +599,7 @@ export class StagesController {
       await this.prisma.plmStage.updateMany({
         where: {
           pipelineVersionId: versionId,
+          tenantId,
           stageOrder: { gt: oldOrder, lte: newOrder },
         },
         data: { stageOrder: { decrement: 1 } },
@@ -608,6 +609,7 @@ export class StagesController {
       await this.prisma.plmStage.updateMany({
         where: {
           pipelineVersionId: versionId,
+          tenantId,
           stageOrder: { gte: newOrder, lt: oldOrder },
         },
         data: { stageOrder: { increment: 1 } },
