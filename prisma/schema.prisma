@@ -1486,3 +1486,406 @@ model FormSubmission {
   @@index([submittedAt])
   @@map("form_submissions")
 }
+
+// ============================================
+// PLM DOMAIN - Pipeline Lifecycle Manager
+// ============================================
+
+/// Pipeline - represents a workflow pipeline definition
+model PlmPipeline {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  projectId       String?   @map("project_id")
+  projectName     String?   @map("project_name")
+  key             String    // Unique key within tenant (e.g., "ONBOARDING")
+  name            String
+  description     String?
+  lifecycleStatus String    @default("DRAFT") @map("lifecycle_status") // DRAFT, TEST, PUBLISHED, CLOSED, ARCHIVED
+  publishedVersion Int?     @map("published_version")
+  createdBy       String?   @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  versions    PlmPipelineVersion[]
+  cards       PlmCard[]
+  permissions PlmPipelinePermission[]
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@index([tenantId, lifecycleStatus])
+  @@index([tenantId, projectId])
+  @@map("plm_pipelines")
+}
+
+/// PlmPipelineVersion - versioned snapshots of pipeline configuration
+model PlmPipelineVersion {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  pipelineId      String    @map("pipeline_id")
+  versionNumber   Int       @map("version_number")
+  versionStatus   String    @default("DRAFT") @map("version_status") // DRAFT, PUBLISHED
+  publishedAt     DateTime? @map("published_at")
+  publishedBy     String?   @map("published_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  pipeline    PlmPipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stages      PlmStage[]
+  transitions PlmStageTransition[]
+
+  @@unique([pipelineId, versionNumber])
+  @@index([tenantId])
+  @@index([tenantId, pipelineId])
+  @@index([tenantId, versionStatus])
+  @@map("plm_pipeline_versions")
+}
+
+/// PlmStage - represents a stage/column in the pipeline
+model PlmStage {
+  id                String   @id @default(uuid())
+  tenantId          String   @map("tenant_id")
+  pipelineVersionId String   @map("pipeline_version_id")
+  name              String
+  stageOrder        Int      @map("stage_order")
+  classification    String   @default("NOT_STARTED") // NOT_STARTED, ON_GOING, WAITING, FINISHED, CANCELED
+  color             String   @default("#6B7280")
+  isInitial         Boolean  @default(false) @map("is_initial")
+  isFinal           Boolean  @default(false) @map("is_final")
+  wipLimit          Int?     @map("wip_limit") // Work-in-progress limit
+  slaHours          Int?     @map("sla_hours")
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  pipelineVersion   PlmPipelineVersion       @relation(fields: [pipelineVersionId], references: [id], onDelete: Cascade)
+  formAttachRules   PlmStageFormAttachRule[]
+  triggers          PlmStageTrigger[]
+  fromTransitions   PlmStageTransition[]     @relation("FromStage")
+  toTransitions     PlmStageTransition[]     @relation("ToStage")
+  cards             PlmCard[]
+  moveHistoryFrom   PlmCardMoveHistory[]     @relation("FromStageHistory")
+  moveHistoryTo     PlmCardMoveHistory[]     @relation("ToStageHistory")
+
+  @@unique([pipelineVersionId, stageOrder])
+  @@index([tenantId])
+  @@index([tenantId, pipelineVersionId])
+  @@index([classification])
+  @@map("plm_stages")
+}
+
+/// PlmStageTransition - allowed transitions between stages
+model PlmStageTransition {
+  id                String   @id @default(uuid())
+  tenantId          String   @map("tenant_id")
+  pipelineVersionId String   @map("pipeline_version_id")
+  fromStageId       String   @map("from_stage_id")
+  toStageId         String   @map("to_stage_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  pipelineVersion PlmPipelineVersion       @relation(fields: [pipelineVersionId], references: [id], onDelete: Cascade)
+  fromStage       PlmStage                 @relation("FromStage", fields: [fromStageId], references: [id], onDelete: Cascade)
+  toStage         PlmStage                 @relation("ToStage", fields: [toStageId], references: [id], onDelete: Cascade)
+  rules           PlmStageTransitionRule[]
+
+  @@unique([pipelineVersionId, fromStageId, toStageId])
+  @@index([tenantId])
+  @@index([fromStageId])
+  @@index([toStageId])
+  @@map("plm_stage_transitions")
+}
+
+/// PlmStageTransitionRule - rules that must be satisfied for a transition
+model PlmStageTransitionRule {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  transitionId     String   @map("transition_id")
+  ruleType         String   @map("rule_type") // FORM_REQUIRED, COMMENT_REQUIRED, OWNER_ONLY
+  formDefinitionId String?  @map("form_definition_id") // For FORM_REQUIRED rule, links to DataEntryForm
+  enabled          Boolean  @default(true)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  transition PlmStageTransition @relation(fields: [transitionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([transitionId])
+  @@map("plm_stage_transition_rules")
+}
+
+/// PlmStageFormAttachRule - rules for attaching forms to cards at stages
+model PlmStageFormAttachRule {
+  id                String   @id @default(uuid())
+  tenantId          String   @map("tenant_id")
+  stageId           String   @map("stage_id")
+  formDefinitionId  String?  @map("form_definition_id") // Links to DataEntryForm
+  externalFormId    String?  @map("external_form_id") // For external forms
+  externalFormName  String?  @map("external_form_name")
+  defaultFormStatus String   @default("TO_FILL") @map("default_form_status") // FILLED, TO_FILL, LOCKED
+  uniqueKeyFieldId  String?  @map("unique_key_field_id") // Field to use as unique key for dedup
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  stage PlmStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([stageId])
+  @@index([formDefinitionId])
+  @@map("plm_stage_form_attach_rules")
+}
+
+/// PlmCard - represents an item/card moving through the pipeline
+model PlmCard {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  pipelineId      String    @map("pipeline_id")
+  pipelineVersion Int       @map("pipeline_version")
+  currentStageId  String    @map("current_stage_id")
+  title           String
+  description     String?
+  priority        String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status          String    @default("ACTIVE") // ACTIVE, CLOSED, ARCHIVED
+  uniqueKeyValue  String?   @map("unique_key_value") // Unique identifier for dedup
+  ownerId         String?   @map("owner_id") // User who owns the card
+  metadata        Json?
+  createdBy       String?   @map("created_by")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  closedAt        DateTime? @map("closed_at")
+
+  // Relations
+  pipeline     PlmPipeline          @relation(fields: [pipelineId], references: [id])
+  currentStage PlmStage             @relation(fields: [currentStageId], references: [id])
+  forms        PlmCardForm[]
+  moveHistory  PlmCardMoveHistory[]
+  comments     PlmCardComment[]
+  triggerExecutions PlmTriggerExecution[]
+
+  @@unique([tenantId, pipelineId, uniqueKeyValue])
+  @@index([tenantId])
+  @@index([tenantId, pipelineId])
+  @@index([tenantId, pipelineId, currentStageId])
+  @@index([tenantId, status])
+  @@index([tenantId, priority])
+  @@index([tenantId, ownerId])
+  @@map("plm_cards")
+}
+
+/// PlmCardForm - form data attached to a card
+model PlmCardForm {
+  id                String   @id @default(uuid())
+  tenantId          String   @map("tenant_id")
+  cardId            String   @map("card_id")
+  formDefinitionId  String?  @map("form_definition_id") // Links to DataEntryForm
+  externalFormId    String?  @map("external_form_id")
+  formVersion       String?  @map("form_version")
+  status            String   @default("TO_FILL") // FILLED, TO_FILL, LOCKED
+  data              Json     @default("{}")
+  attachedAtStageId String   @map("attached_at_stage_id")
+  attachedAt        DateTime @default(now()) @map("attached_at")
+  filledAt          DateTime? @map("filled_at")
+  filledBy          String?  @map("filled_by")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  card PlmCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([cardId])
+  @@index([formDefinitionId])
+  @@index([status])
+  @@map("plm_card_forms")
+}
+
+/// PlmCardMoveHistory - history of card movements between stages
+model PlmCardMoveHistory {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  cardId      String   @map("card_id")
+  fromStageId String   @map("from_stage_id")
+  toStageId   String   @map("to_stage_id")
+  reason      String   @default("MANUAL") // MANUAL, API, AUTOMATION
+  movedBy     String?  @map("moved_by")
+  comment     String?
+  movedAt     DateTime @default(now()) @map("moved_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  card      PlmCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  fromStage PlmStage @relation("FromStageHistory", fields: [fromStageId], references: [id])
+  toStage   PlmStage @relation("ToStageHistory", fields: [toStageId], references: [id])
+
+  @@index([tenantId])
+  @@index([cardId])
+  @@index([movedAt])
+  @@map("plm_card_move_history")
+}
+
+/// PlmCardComment - comments on cards
+model PlmCardComment {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  cardId    String   @map("card_id")
+  userId    String?  @map("user_id")
+  userName  String   @map("user_name")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  card PlmCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([cardId])
+  @@index([createdAt])
+  @@map("plm_card_comments")
+}
+
+/// PlmStageTrigger - automation triggers for stage events
+model PlmStageTrigger {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  stageId          String   @map("stage_id")
+  integrationId    String?  @map("integration_id") // Links to external integration
+  integrationName  String?  @map("integration_name")
+  integrationKey   String?  @map("integration_key")
+  eventType        String   @map("event_type") // CARD_MOVEMENT, FORM_FIELD_CHANGE
+  fromStageId      String?  @map("from_stage_id") // Filter: only trigger when coming from this stage
+  formDefinitionId String?  @map("form_definition_id") // For FORM_FIELD_CHANGE event
+  fieldId          String?  @map("field_id") // Specific field to monitor
+  executionOrder   Int      @default(0) @map("execution_order")
+  enabled          Boolean  @default(true)
+  httpMethod       String?  @map("http_method") // GET, POST, PUT, PATCH, DELETE
+  endpoint         String?
+  defaultPayload   Json?    @map("default_payload")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  stage      PlmStage                  @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  conditions PlmStageTriggerCondition[]
+  executions PlmTriggerExecution[]
+
+  @@index([tenantId])
+  @@index([stageId])
+  @@index([eventType])
+  @@index([enabled])
+  @@map("plm_stage_triggers")
+}
+
+/// PlmStageTriggerCondition - conditions for trigger execution
+model PlmStageTriggerCondition {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  triggerId String   @map("trigger_id")
+  fieldPath String   @map("field_path") // JSONPath or dot notation to field
+  operator  String   // EQUALS, NOT_EQUALS, GREATER_THAN, LESS_THAN, CONTAINS, etc.
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  trigger PlmStageTrigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([triggerId])
+  @@map("plm_stage_trigger_conditions")
+}
+
+/// PlmTriggerExecution - log of trigger executions
+model PlmTriggerExecution {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  triggerId       String    @map("trigger_id")
+  cardId          String    @map("card_id")
+  status          String    @default("PENDING") // PENDING, SUCCESS, FAILURE
+  eventType       String    @map("event_type")
+  integrationName String?   @map("integration_name")
+  integrationKey  String?   @map("integration_key")
+  stageName       String?   @map("stage_name")
+  requestPayload  Json?     @map("request_payload")
+  responsePayload Json?     @map("response_payload")
+  errorMessage    String?   @map("error_message")
+  executedAt      DateTime  @default(now()) @map("executed_at")
+  completedAt     DateTime? @map("completed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  trigger PlmStageTrigger @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  card    PlmCard         @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([triggerId])
+  @@index([cardId])
+  @@index([status])
+  @@index([executedAt])
+  @@map("plm_trigger_executions")
+}
+
+/// PlmUserGroup - user groups for pipeline permissions
+model PlmUserGroup {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  members     PlmGroupMember[]
+  permissions PlmPipelinePermission[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("plm_user_groups")
+}
+
+/// PlmGroupMember - members of user groups
+model PlmGroupMember {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  groupId   String   @map("group_id")
+  userId    String   @map("user_id")
+  userName  String?  @map("user_name")
+  userEmail String?  @map("user_email")
+  addedBy   String?  @map("added_by")
+  addedAt   DateTime @default(now()) @map("added_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  group PlmUserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@index([tenantId])
+  @@index([groupId])
+  @@index([userId])
+  @@map("plm_group_members")
+}
+
+/// PlmPipelinePermission - role-based access to pipelines
+model PlmPipelinePermission {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  pipelineId String   @map("pipeline_id")
+  groupId    String   @map("group_id")
+  role       String   // VIEWER, OPERATOR, SUPERVISOR, ADMIN
+  createdBy  String?  @map("created_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  pipeline PlmPipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  group    PlmUserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([pipelineId, groupId])
+  @@index([tenantId])
+  @@index([pipelineId])
+  @@index([groupId])
+  @@map("plm_pipeline_permissions")
+}
