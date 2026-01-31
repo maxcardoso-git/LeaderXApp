@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
 import { PrismaService } from '@infrastructure/persistence/prisma.service';
-import { IsNumber, Min, IsString, IsOptional } from 'class-validator';
+import { IsNumber, Min, IsString, IsOptional, IsNotEmpty } from 'class-validator';
 
 // ============================================
 // Reorder DTO
@@ -27,6 +27,7 @@ class ReorderStageDto {
 
 class AddTransitionDto {
   @IsString()
+  @IsNotEmpty()
   toStageId: string;
 }
 
