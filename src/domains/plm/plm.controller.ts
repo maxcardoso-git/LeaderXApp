@@ -14,6 +14,16 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
 import { PrismaService } from '@infrastructure/persistence/prisma.service';
+import { IsNumber, Min } from 'class-validator';
+
+// ============================================
+// Reorder DTO
+// ============================================
+class ReorderStageDto {
+  @IsNumber()
+  @Min(0)
+  newOrder: number;
+}
 
 // ============================================
 // DTOs & Types
@@ -502,70 +512,6 @@ export class StagesController {
     return stage;
   }
 
-  @Put(':stageId')
-  @ApiOperation({ summary: 'Update stage' })
-  async update(
-    @Headers('x-tenant-id') tenantId: string,
-    @Param('pipelineId') pipelineId: string,
-    @Param('versionId') versionId: string,
-    @Param('stageId') stageId: string,
-    @Body() dto: any,
-  ) {
-    const version = await this.prisma.plmPipelineVersion.findFirst({
-      where: { id: versionId, pipelineId, tenantId },
-    });
-    if (!version) throw new HttpException({ error: 'VERSION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
-    if (version.versionStatus !== 'DRAFT') {
-      throw new HttpException({ error: 'VERSION_NOT_EDITABLE' }, HttpStatus.BAD_REQUEST);
-    }
-
-    const stage = await this.prisma.plmStage.findFirst({
-      where: { id: stageId, pipelineVersionId: versionId, tenantId },
-    });
-    if (!stage) throw new HttpException({ error: 'STAGE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
-
-    return this.prisma.plmStage.update({
-      where: { id: stageId },
-      data: {
-        name: dto.name ?? stage.name,
-        stageOrder: dto.stageOrder ?? stage.stageOrder,
-        classification: dto.classification ?? stage.classification,
-        color: dto.color ?? stage.color,
-        isInitial: dto.isInitial ?? stage.isInitial,
-        isFinal: dto.isFinal ?? stage.isFinal,
-        wipLimit: dto.wipLimit !== undefined ? dto.wipLimit : stage.wipLimit,
-        slaHours: dto.slaHours !== undefined ? dto.slaHours : stage.slaHours,
-        active: dto.active ?? stage.active,
-      },
-    });
-  }
-
-  @Delete(':stageId')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete stage' })
-  async delete(
-    @Headers('x-tenant-id') tenantId: string,
-    @Param('pipelineId') pipelineId: string,
-    @Param('versionId') versionId: string,
-    @Param('stageId') stageId: string,
-  ) {
-    const version = await this.prisma.plmPipelineVersion.findFirst({
-      where: { id: versionId, pipelineId, tenantId },
-    });
-    if (!version) throw new HttpException({ error: 'VERSION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
-    if (version.versionStatus !== 'DRAFT') {
-      throw new HttpException({ error: 'VERSION_NOT_EDITABLE' }, HttpStatus.BAD_REQUEST);
-    }
-
-    const stage = await this.prisma.plmStage.findFirst({
-      where: { id: stageId, pipelineVersionId: versionId, tenantId },
-    });
-    if (!stage) throw new HttpException({ error: 'STAGE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
-
-    await this.prisma.plmStage.delete({ where: { id: stageId } });
-    return stage;
-  }
-
   @Put(':stageId/reorder')
   @ApiOperation({ summary: 'Reorder stage' })
   async reorder(
@@ -573,7 +519,7 @@ export class StagesController {
     @Param('pipelineId') pipelineId: string,
     @Param('versionId') versionId: string,
     @Param('stageId') stageId: string,
-    @Body() dto: { newOrder: number },
+    @Body() dto: ReorderStageDto,
   ) {
     try {
       console.log('[REORDER] Starting:', { tenantId, pipelineId, versionId, stageId, dto });
@@ -646,6 +592,70 @@ export class StagesController {
       console.error('[REORDER] Error:', error);
       throw error;
     }
+  }
+
+  @Put(':stageId')
+  @ApiOperation({ summary: 'Update stage' })
+  async update(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('pipelineId') pipelineId: string,
+    @Param('versionId') versionId: string,
+    @Param('stageId') stageId: string,
+    @Body() dto: any,
+  ) {
+    const version = await this.prisma.plmPipelineVersion.findFirst({
+      where: { id: versionId, pipelineId, tenantId },
+    });
+    if (!version) throw new HttpException({ error: 'VERSION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    if (version.versionStatus !== 'DRAFT') {
+      throw new HttpException({ error: 'VERSION_NOT_EDITABLE' }, HttpStatus.BAD_REQUEST);
+    }
+
+    const stage = await this.prisma.plmStage.findFirst({
+      where: { id: stageId, pipelineVersionId: versionId, tenantId },
+    });
+    if (!stage) throw new HttpException({ error: 'STAGE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    return this.prisma.plmStage.update({
+      where: { id: stageId },
+      data: {
+        name: dto.name ?? stage.name,
+        stageOrder: dto.stageOrder ?? stage.stageOrder,
+        classification: dto.classification ?? stage.classification,
+        color: dto.color ?? stage.color,
+        isInitial: dto.isInitial ?? stage.isInitial,
+        isFinal: dto.isFinal ?? stage.isFinal,
+        wipLimit: dto.wipLimit !== undefined ? dto.wipLimit : stage.wipLimit,
+        slaHours: dto.slaHours !== undefined ? dto.slaHours : stage.slaHours,
+        active: dto.active ?? stage.active,
+      },
+    });
+  }
+
+  @Delete(':stageId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete stage' })
+  async delete(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('pipelineId') pipelineId: string,
+    @Param('versionId') versionId: string,
+    @Param('stageId') stageId: string,
+  ) {
+    const version = await this.prisma.plmPipelineVersion.findFirst({
+      where: { id: versionId, pipelineId, tenantId },
+    });
+    if (!version) throw new HttpException({ error: 'VERSION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    if (version.versionStatus !== 'DRAFT') {
+      throw new HttpException({ error: 'VERSION_NOT_EDITABLE' }, HttpStatus.BAD_REQUEST);
+    }
+
+    const stage = await this.prisma.plmStage.findFirst({
+      where: { id: stageId, pipelineVersionId: versionId, tenantId },
+    });
+    if (!stage) throw new HttpException({ error: 'STAGE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    await this.prisma.plmStage.delete({ where: { id: stageId } });
+    return stage;
   }
 
   // ============================================
