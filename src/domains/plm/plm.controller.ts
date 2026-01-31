@@ -593,32 +593,42 @@ export class StagesController {
 
     if (oldOrder === newOrder) return stage;
 
-    // Shift other stages
-    if (oldOrder < newOrder) {
-      // Moving down: decrease order of stages between old and new
-      await this.prisma.plmStage.updateMany({
-        where: {
-          pipelineVersionId: versionId,
-          tenantId,
-          stageOrder: { gt: oldOrder, lte: newOrder },
-        },
-        data: { stageOrder: { decrement: 1 } },
+    // Use transaction to handle unique constraint on (pipelineVersionId, stageOrder)
+    return this.prisma.$transaction(async (tx) => {
+      // Step 1: Set target stage to temporary value to avoid unique constraint
+      await tx.plmStage.update({
+        where: { id: stageId },
+        data: { stageOrder: -1 },
       });
-    } else {
-      // Moving up: increase order of stages between new and old
-      await this.prisma.plmStage.updateMany({
-        where: {
-          pipelineVersionId: versionId,
-          tenantId,
-          stageOrder: { gte: newOrder, lt: oldOrder },
-        },
-        data: { stageOrder: { increment: 1 } },
-      });
-    }
 
-    return this.prisma.plmStage.update({
-      where: { id: stageId },
-      data: { stageOrder: newOrder },
+      // Step 2: Shift other stages
+      if (oldOrder < newOrder) {
+        // Moving down: decrease order of stages between old and new
+        await tx.plmStage.updateMany({
+          where: {
+            pipelineVersionId: versionId,
+            tenantId,
+            stageOrder: { gt: oldOrder, lte: newOrder },
+          },
+          data: { stageOrder: { decrement: 1 } },
+        });
+      } else {
+        // Moving up: increase order of stages between new and old
+        await tx.plmStage.updateMany({
+          where: {
+            pipelineVersionId: versionId,
+            tenantId,
+            stageOrder: { gte: newOrder, lt: oldOrder },
+          },
+          data: { stageOrder: { increment: 1 } },
+        });
+      }
+
+      // Step 3: Set target stage to final position
+      return tx.plmStage.update({
+        where: { id: stageId },
+        data: { stageOrder: newOrder },
+      });
     });
   }
 
