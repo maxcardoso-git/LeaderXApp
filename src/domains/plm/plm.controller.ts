@@ -575,61 +575,77 @@ export class StagesController {
     @Param('stageId') stageId: string,
     @Body() dto: { newOrder: number },
   ) {
-    const version = await this.prisma.plmPipelineVersion.findFirst({
-      where: { id: versionId, pipelineId, tenantId },
-    });
-    if (!version) throw new HttpException({ error: 'VERSION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
-    if (version.versionStatus !== 'DRAFT') {
-      throw new HttpException({ error: 'VERSION_NOT_EDITABLE' }, HttpStatus.BAD_REQUEST);
-    }
+    try {
+      console.log('[REORDER] Starting:', { tenantId, pipelineId, versionId, stageId, dto });
 
-    const stage = await this.prisma.plmStage.findFirst({
-      where: { id: stageId, pipelineVersionId: versionId, tenantId },
-    });
-    if (!stage) throw new HttpException({ error: 'STAGE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
-
-    const oldOrder = stage.stageOrder;
-    const newOrder = dto.newOrder;
-
-    if (oldOrder === newOrder) return stage;
-
-    // Use transaction to handle unique constraint on (pipelineVersionId, stageOrder)
-    return this.prisma.$transaction(async (tx) => {
-      // Step 1: Set target stage to temporary value to avoid unique constraint
-      await tx.plmStage.update({
-        where: { id: stageId },
-        data: { stageOrder: -1 },
+      const version = await this.prisma.plmPipelineVersion.findFirst({
+        where: { id: versionId, pipelineId, tenantId },
       });
-
-      // Step 2: Shift other stages
-      if (oldOrder < newOrder) {
-        // Moving down: decrease order of stages between old and new
-        await tx.plmStage.updateMany({
-          where: {
-            pipelineVersionId: versionId,
-            tenantId,
-            stageOrder: { gt: oldOrder, lte: newOrder },
-          },
-          data: { stageOrder: { decrement: 1 } },
-        });
-      } else {
-        // Moving up: increase order of stages between new and old
-        await tx.plmStage.updateMany({
-          where: {
-            pipelineVersionId: versionId,
-            tenantId,
-            stageOrder: { gte: newOrder, lt: oldOrder },
-          },
-          data: { stageOrder: { increment: 1 } },
-        });
+      if (!version) throw new HttpException({ error: 'VERSION_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+      if (version.versionStatus !== 'DRAFT') {
+        throw new HttpException({ error: 'VERSION_NOT_EDITABLE' }, HttpStatus.BAD_REQUEST);
       }
 
-      // Step 3: Set target stage to final position
-      return tx.plmStage.update({
-        where: { id: stageId },
-        data: { stageOrder: newOrder },
+      const stage = await this.prisma.plmStage.findFirst({
+        where: { id: stageId, pipelineVersionId: versionId, tenantId },
       });
-    });
+      if (!stage) throw new HttpException({ error: 'STAGE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+      const oldOrder = stage.stageOrder;
+      const newOrder = dto.newOrder;
+
+      console.log('[REORDER] Moving stage from order', oldOrder, 'to', newOrder);
+
+      if (oldOrder === newOrder) return stage;
+
+      // Use transaction to handle unique constraint on (pipelineVersionId, stageOrder)
+      const result = await this.prisma.$transaction(async (tx) => {
+        // Step 1: Set target stage to temporary value to avoid unique constraint
+        console.log('[REORDER] Step 1: Setting stage to temporary order -1');
+        await tx.plmStage.update({
+          where: { id: stageId },
+          data: { stageOrder: -1 },
+        });
+
+        // Step 2: Shift other stages
+        if (oldOrder < newOrder) {
+          // Moving down: decrease order of stages between old and new
+          console.log('[REORDER] Step 2: Moving down - decrementing stages between', oldOrder, 'and', newOrder);
+          await tx.plmStage.updateMany({
+            where: {
+              pipelineVersionId: versionId,
+              tenantId,
+              stageOrder: { gt: oldOrder, lte: newOrder },
+            },
+            data: { stageOrder: { decrement: 1 } },
+          });
+        } else {
+          // Moving up: increase order of stages between new and old
+          console.log('[REORDER] Step 2: Moving up - incrementing stages between', newOrder, 'and', oldOrder);
+          await tx.plmStage.updateMany({
+            where: {
+              pipelineVersionId: versionId,
+              tenantId,
+              stageOrder: { gte: newOrder, lt: oldOrder },
+            },
+            data: { stageOrder: { increment: 1 } },
+          });
+        }
+
+        // Step 3: Set target stage to final position
+        console.log('[REORDER] Step 3: Setting stage to final order', newOrder);
+        return tx.plmStage.update({
+          where: { id: stageId },
+          data: { stageOrder: newOrder },
+        });
+      });
+
+      console.log('[REORDER] Success:', result);
+      return result;
+    } catch (error) {
+      console.error('[REORDER] Error:', error);
+      throw error;
+    }
   }
 
   // ============================================
