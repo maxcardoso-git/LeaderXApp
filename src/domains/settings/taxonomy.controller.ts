@@ -307,12 +307,6 @@ export class LinesController {
       throw new HttpException({ error: 'LINE_CODE_EXISTS' }, HttpStatus.CONFLICT);
     }
 
-    // Store allowedBlocks in metadata if provided
-    const metadata = dto.metadata ?? {};
-    if (dto.allowedBlocks) {
-      metadata.allowedBlocks = dto.allowedBlocks;
-    }
-
     return this.prisma.line.create({
       data: {
         tenantId,
@@ -323,7 +317,14 @@ export class LinesController {
         icon: dto.icon,
         color: dto.color,
         sortOrder: dto.sortOrder ?? 0,
-        metadata,
+        // Strategic Event Classification
+        purposeId: dto.purposeId,
+        targetAudiences: dto.targetAudiences ?? [],
+        seniorityLevel: dto.seniorityLevel,
+        interactionFormats: dto.interactionFormats ?? [],
+        relationshipDepth: dto.relationshipDepth,
+        strategicTags: dto.strategicTags ?? [],
+        metadata: dto.metadata ?? {},
       },
     });
   }
@@ -336,6 +337,7 @@ export class LinesController {
     @Query('size') size = 25,
     @Query('search') search?: string,
     @Query('segmentId') segmentId?: string,
+    @Query('purposeId') purposeId?: string,
   ): Promise<PaginatedResponse<any>> {
     const skip = (page - 1) * size;
     const where: any = { tenantId };
@@ -348,17 +350,12 @@ export class LinesController {
     }
 
     if (segmentId) where.segmentId = segmentId;
+    if (purposeId) where.purposeId = purposeId;
 
-    const [rawItems, total] = await Promise.all([
+    const [items, total] = await Promise.all([
       this.prisma.line.findMany({ where, skip, take: Number(size), orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }] }),
       this.prisma.line.count({ where }),
     ]);
-
-    // Transform items to include allowedBlocks at root level
-    const items = rawItems.map((item) => ({
-      ...item,
-      allowedBlocks: (item.metadata as any)?.allowedBlocks || {},
-    }));
 
     return { items, page: Number(page), size: Number(size), total };
   }
@@ -377,15 +374,7 @@ export class LinesController {
     const existing = await this.prisma.line.findFirst({ where: { id, tenantId } });
     if (!existing) throw new HttpException({ error: 'LINE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
 
-    // Merge allowedBlocks into metadata
-    let metadata = (existing.metadata as any) || {};
-    if (dto.allowedBlocks) {
-      metadata = { ...metadata, allowedBlocks: dto.allowedBlocks };
-    } else if (dto.metadata) {
-      metadata = dto.metadata;
-    }
-
-    const updated = await this.prisma.line.update({
+    return this.prisma.line.update({
       where: { id },
       data: {
         name: dto.name ?? existing.name,
@@ -395,15 +384,16 @@ export class LinesController {
         color: dto.color ?? existing.color,
         sortOrder: dto.sortOrder ?? existing.sortOrder,
         status: dto.status ?? existing.status,
-        metadata,
+        // Strategic Event Classification
+        purposeId: dto.purposeId !== undefined ? dto.purposeId : existing.purposeId,
+        targetAudiences: dto.targetAudiences !== undefined ? dto.targetAudiences : existing.targetAudiences,
+        seniorityLevel: dto.seniorityLevel !== undefined ? dto.seniorityLevel : existing.seniorityLevel,
+        interactionFormats: dto.interactionFormats !== undefined ? dto.interactionFormats : existing.interactionFormats,
+        relationshipDepth: dto.relationshipDepth !== undefined ? dto.relationshipDepth : existing.relationshipDepth,
+        strategicTags: dto.strategicTags !== undefined ? dto.strategicTags : existing.strategicTags,
+        metadata: dto.metadata ?? existing.metadata,
       },
     });
-
-    // Return with frontend-friendly format
-    return {
-      ...updated,
-      allowedBlocks: (updated.metadata as any)?.allowedBlocks || {},
-    };
   }
 
   @Delete(':id')

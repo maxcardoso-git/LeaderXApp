@@ -923,26 +923,34 @@ model Segment {
   @@map("segments")
 }
 
-/// Line - product/service lines
+/// Line - product/service lines with strategic event classification
 model Line {
-  id          String   @id @default(uuid())
-  tenantId    String   @map("tenant_id")
-  code        String
-  name        String
-  description String?
-  segmentId   String?  @map("segment_id")
-  icon        String?
-  color       String?
-  sortOrder   Int      @default(0) @map("sort_order")
-  status      String   @default("ACTIVE")
-  metadata    Json?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(uuid())
+  tenantId           String   @map("tenant_id")
+  code               String
+  name               String
+  description        String?
+  segmentId          String?  @map("segment_id")
+  icon               String?
+  color              String?
+  sortOrder          Int      @default(0) @map("sort_order")
+  status             String   @default("ACTIVE")
+  // Strategic Event Classification
+  purposeId          String?  @map("purpose_id") // Single selection: NETWORKING, CONTENT, RELATIONSHIP, etc.
+  targetAudiences    String[] @default([]) @map("target_audiences") // Multi-selection: C_LEVEL, FOUNDERS, etc.
+  seniorityLevel     String?  @map("seniority_level") // Single selection: EXPLORATORY, INTERMEDIATE, etc.
+  interactionFormats String[] @default([]) @map("interaction_formats") // Multi-selection: TABLES, PANELS, etc.
+  relationshipDepth  Int?     @map("relationship_depth") // 1-5 scale
+  strategicTags      String[] @default([]) @map("strategic_tags") // Free-form tags
+  metadata           Json?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([tenantId, segmentId])
   @@index([tenantId, status])
+  @@index([tenantId, purposeId])
   @@map("lines")
 }
 
