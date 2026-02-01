@@ -23,6 +23,7 @@ import {
   EventActivatedEvent,
   EventClosedEvent,
   EventCanceledEvent,
+  EventReopenedEvent,
   EventPhaseAddedEvent,
   EventTableAddedEvent,
   EventSeatAddedEvent,
@@ -311,6 +312,20 @@ export class EventAggregate {
 
     this.addDomainEvent(
       new EventCanceledEvent({
+        eventId: this._id,
+        tenantId: this._tenantId,
+        reason,
+      }),
+    );
+  }
+
+  reopen(reason?: string): void {
+    this.validateStatusTransition(EventStatus.DRAFT);
+    this._status = EventStatus.DRAFT;
+    this._updatedAt = new Date();
+
+    this.addDomainEvent(
+      new EventReopenedEvent({
         eventId: this._id,
         tenantId: this._tenantId,
         reason,

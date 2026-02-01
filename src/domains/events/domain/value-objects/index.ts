@@ -43,6 +43,6 @@ export const VALID_STATUS_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
   [EventStatus.DRAFT]: [EventStatus.PUBLISHED, EventStatus.CANCELED],
   [EventStatus.PUBLISHED]: [EventStatus.ACTIVE, EventStatus.DRAFT, EventStatus.CANCELED],
   [EventStatus.ACTIVE]: [EventStatus.CLOSED, EventStatus.CANCELED],
-  [EventStatus.CLOSED]: [],
+  [EventStatus.CLOSED]: [EventStatus.DRAFT], // Allow reopen to DRAFT
   [EventStatus.CANCELED]: [],
 };

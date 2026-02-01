@@ -11,7 +11,7 @@ import {
 } from '../dtos';
 import {
   CreateEventUseCase, UpdateEventUseCase, ListEventsUseCase, DeleteEventUseCase,
-  PublishEventUseCase, ActivateEventUseCase, CloseEventUseCase, CancelEventUseCase,
+  PublishEventUseCase, ActivateEventUseCase, CloseEventUseCase, CancelEventUseCase, ReopenEventUseCase,
   AddEventPhaseUseCase, UpdateEventPhaseUseCase, RemoveEventPhaseUseCase,
   AddEventTableUseCase, UpdateEventTableUseCase, RemoveEventTableUseCase,
   AddEventSeatUseCase, RemoveEventSeatUseCase,
@@ -37,6 +37,7 @@ export class AdminEventsController {
     private readonly activateEvent: ActivateEventUseCase,
     private readonly closeEvent: CloseEventUseCase,
     private readonly cancelEvent: CancelEventUseCase,
+    private readonly reopenEvent: ReopenEventUseCase,
     private readonly addPhase: AddEventPhaseUseCase,
     private readonly updatePhase: UpdateEventPhaseUseCase,
     private readonly removePhase: RemoveEventPhaseUseCase,
@@ -296,6 +297,18 @@ export class AdminEventsController {
     @Body() dto: CancelEventDto,
   ): Promise<EventResponseDto> {
     const { event } = await this.cancelEvent.execute({ tenantId, eventId, reason: dto.reason, actorId });
+    return this.toEventResponse(event);
+  }
+
+  @Post(':eventId/reopen')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reopen a closed event (returns to DRAFT status)' })
+  async reopen(
+    @Headers('x-tenant-id') tenantId: string,
+    @Headers('x-actor-id') actorId: string,
+    @Param('eventId') eventId: string,
+  ): Promise<EventResponseDto> {
+    const { event } = await this.reopenEvent.execute({ tenantId, eventId, actorId });
     return this.toEventResponse(event);
   }
 

@@ -91,6 +91,18 @@ export class EventCanceledEvent implements DomainEvent {
   }
 }
 
+// Event Reopened
+export class EventReopenedEvent implements DomainEvent {
+  readonly eventType = 'EventReopened';
+  readonly occurredAt: Date;
+  readonly payload: Record<string, unknown>;
+
+  constructor(data: { eventId: string; tenantId: string; reason?: string }) {
+    this.occurredAt = new Date();
+    this.payload = data;
+  }
+}
+
 // Event Phase Added
 export class EventPhaseAddedEvent implements DomainEvent {
   readonly eventType = 'EventPhaseAdded';

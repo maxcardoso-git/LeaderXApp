@@ -123,3 +123,33 @@ export class CancelEventUseCase {
     });
   }
 }
+
+export interface ReopenEventInput extends LifecycleInput {
+  reason?: string;
+}
+
+@Injectable()
+export class ReopenEventUseCase {
+  constructor(
+    @Inject(EVENT_REPOSITORY) private readonly eventRepository: EventRepositoryPort,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  async execute(input: ReopenEventInput): Promise<LifecycleOutput> {
+    return this.prisma.$transaction(async (tx) => {
+      const event = await this.eventRepository.findById(input.tenantId, input.eventId, { tx });
+      if (!event) throw new EventNotFoundError(input.eventId);
+
+      event.reopen(input.reason);
+      await this.eventRepository.update(event, { tx });
+
+      for (const de of event.domainEvents) {
+        await tx.outboxEvent.create({
+          data: { tenantId: input.tenantId, aggregateType: 'EVENT', aggregateId: event.id, eventType: de.eventType, payload: de.payload as Prisma.InputJsonValue, metadata: { actorId: input.actorId, reason: input.reason } as Prisma.InputJsonValue },
+        });
+      }
+      event.clearDomainEvents();
+      return { event };
+    });
+  }
+}
