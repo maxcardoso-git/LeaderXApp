@@ -33,9 +33,9 @@ import {
   GovernanceController,
   WorkingUnitsController,
   PositionsController,
-  HierarchyGroupsController,
-  ScopesController,
   GovernanceStatsController,
+  ApprovalPoliciesController,
+  ApprovalRequestsController,
 } from './inbound/controllers';
 
 const repositories = [
@@ -60,9 +60,10 @@ const useCases = [
     GovernanceController,
     WorkingUnitsController,
     PositionsController,
-    HierarchyGroupsController,
-    ScopesController,
     GovernanceStatsController,
+    // Approval Engine Controllers
+    ApprovalPoliciesController,
+    ApprovalRequestsController,
   ],
   providers: [
     PrismaService,

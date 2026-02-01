@@ -1975,3 +1975,122 @@ model PlmStageAvatarRule {
   @@index([avatarId])
   @@map("plm_stage_avatar_rules")
 }
+
+// ============================================
+// GOVERNANCE DOMAIN - Approval Engine
+// ============================================
+
+/// GovApprovalPolicy - Defines when an action on an entity requires approval
+/// Maps entityType + action to a PLM pipeline for workflow execution
+model GovApprovalPolicy {
+  id              String   @id @default(uuid())
+  tenantId        String?  @map("tenant_id")
+  code            String   @unique
+  name            String
+  description     String?
+  entityType      String   @map("entity_type") // MEMBER, EVENT, STRUCTURE, RESERVATION, etc.
+  action          String   // CREATE, UPDATE, DELETE, INACTIVATE, ACTIVATE
+  operationScope  Json     @default("{}") @map("operation_scope") // { roles: [], segments: [], communities: [], custom: {} }
+  conditions      Json     @default("{}") // { all: [], any: [] } - JSONLogic-like rules
+  pipelineId      String   @map("pipeline_id") // Links to PlmPipeline
+  pipelineVersion Int      @default(1) @map("pipeline_version")
+  blocking        Boolean  @default(true) // If true, entity stays PENDING until approved
+  enabled         Boolean  @default(true)
+  priority        Int      @default(100) // Lower = higher priority (first match wins)
+  createdBy       String?  @map("created_by")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  requests GovApprovalRequest[]
+
+  @@index([tenantId])
+  @@index([entityType, action, enabled, priority])
+  @@index([pipelineId])
+  @@map("gov_approval_policies")
+}
+
+/// GovApprovalRequest - Tracks an approval request linked to a PLM card
+model GovApprovalRequest {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  requestKey      String    @unique @map("request_key") // Unique key for idempotency
+  policyId        String?   @map("policy_id")
+  pipelineId      String    @map("pipeline_id")
+  pipelineVersion Int       @map("pipeline_version")
+  cardId          String?   @map("card_id") // Links to PlmCard
+  entityType      String    @map("entity_type")
+  entityId        String    @map("entity_id")
+  action          String    // CREATE, UPDATE, DELETE, INACTIVATE, ACTIVATE
+  status          String    @default("PENDING") // PENDING, IN_PROGRESS, APPROVED, REJECTED, CANCELED, EXPIRED
+  blocking        Boolean   @default(true)
+  requestedBy     String?   @map("requested_by")
+  requestedAt     DateTime  @default(now()) @map("requested_at")
+  currentStageKey String?   @map("current_stage_key")
+  dueAt           DateTime? @map("due_at")
+  decision        String?   // APPROVED, REJECTED
+  decidedBy       String?   @map("decided_by")
+  decidedAt       DateTime? @map("decided_at")
+  decisionReason  String?   @map("decision_reason")
+  context         Json      @default("{}") // Request context/metadata
+  snapshot        Json      @default("{}") // Entity state snapshot at request time
+  correlationId   String?   @map("correlation_id")
+  idempotencyKey  String?   @map("idempotency_key")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  policy    GovApprovalPolicy?    @relation(fields: [policyId], references: [id])
+  evidences GovApprovalEvidence[]
+  history   GovApprovalHistory[]
+
+  @@index([tenantId])
+  @@index([entityType, entityId, status])
+  @@index([pipelineId, currentStageKey, status])
+  @@index([status])
+  @@index([cardId])
+  @@map("gov_approval_requests")
+}
+
+/// GovApprovalEvidence - Evidence/attachments for approval requests
+model GovApprovalEvidence {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  requestId     String   @map("request_id")
+  type          String   // DOCUMENT, COMMENT, SCREENSHOT, SIGNATURE, OTHER
+  title         String?
+  content       String?
+  attachmentUrl String?  @map("attachment_url")
+  createdBy     String?  @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  metadata      Json     @default("{}")
+
+  // Relations
+  request GovApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([requestId])
+  @@map("gov_approval_evidences")
+}
+
+/// GovApprovalHistory - History of status changes for approval requests
+model GovApprovalHistory {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  requestId    String   @map("request_id")
+  fromStatus   String?  @map("from_status")
+  toStatus     String   @map("to_status")
+  fromStageKey String?  @map("from_stage_key")
+  toStageKey   String?  @map("to_stage_key")
+  changedBy    String?  @map("changed_by")
+  changedAt    DateTime @default(now()) @map("changed_at")
+  comment      String?
+  metadata     Json     @default("{}")
+
+  // Relations
+  request GovApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([requestId, changedAt])
+  @@map("gov_approval_history")
+}
