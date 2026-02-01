@@ -63,19 +63,29 @@ export class CyclesController {
       metadata.phaseBlocks = dto.phaseBlocks;
     }
 
-    return this.prisma.cycle.create({
+    const created = await this.prisma.cycle.create({
       data: {
         tenantId,
         code,
         name: dto.name,
         description: dto.description,
+        pipelineId: dto.pipelineId,
         startDate: dto.startDate ? new Date(dto.startDate) : new Date(),
         endDate: dto.endDate ? new Date(dto.endDate) : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // Default: 1 year
         isCurrent,
         status: dto.status ?? 'ACTIVE',
         metadata,
       },
+      include: {
+        pipeline: { select: { id: true, key: true, name: true } },
+      },
     });
+
+    return {
+      ...created,
+      isDefault: created.isCurrent,
+      phaseBlocks: (created.metadata as any)?.phaseBlocks || {},
+    };
   }
 
   @Get()
@@ -105,6 +115,9 @@ export class CyclesController {
         skip,
         take: Number(size),
         orderBy: [{ isCurrent: 'desc' }, { startDate: 'desc' }],
+        include: {
+          pipeline: { select: { id: true, key: true, name: true } },
+        },
       }),
       this.prisma.cycle.count({ where }),
     ]);
@@ -181,11 +194,15 @@ export class CyclesController {
       data: {
         name: dto.name ?? existing.name,
         description: dto.description ?? existing.description,
+        pipelineId: dto.pipelineId !== undefined ? dto.pipelineId : existing.pipelineId,
         startDate: dto.startDate ? new Date(dto.startDate) : existing.startDate,
         endDate: dto.endDate ? new Date(dto.endDate) : existing.endDate,
         isCurrent: isCurrent ?? existing.isCurrent,
         status: dto.status ?? existing.status,
         metadata,
+      },
+      include: {
+        pipeline: { select: { id: true, key: true, name: true } },
       },
     });
 
@@ -232,5 +249,193 @@ export class CyclesController {
 
     await this.prisma.cycle.delete({ where: { id } });
     return existing;
+  }
+}
+
+// ============================================
+// AVATAR BENEFIT CONFIG CONTROLLER
+// ============================================
+
+@ApiTags('Workflow - Avatar Benefits')
+@Controller('workflow/avatar-benefits')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class AvatarBenefitConfigController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Get('matrix')
+  @ApiOperation({ summary: 'Get the full avatar x benefit matrix' })
+  async getMatrix(@Headers('x-tenant-id') tenantId: string) {
+    // Get all avatars and benefits
+    const [avatars, benefits, configs] = await Promise.all([
+      this.prisma.participantAvatar.findMany({
+        where: { tenantId },
+        orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
+      }),
+      this.prisma.subscriberBenefit.findMany({
+        where: { tenantId, isActive: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.avatarBenefitConfig.findMany({
+        where: { tenantId },
+      }),
+    ]);
+
+    // Build config map for quick lookup
+    const configMap = new Map<string, any>();
+    configs.forEach((config) => {
+      configMap.set(`${config.avatarId}-${config.benefitId}`, config);
+    });
+
+    // Build matrix with default values for missing configs
+    const matrix = avatars.map((avatar) => ({
+      avatar: {
+        id: avatar.id,
+        code: avatar.code,
+        name: avatar.name,
+        emoji: avatar.emoji,
+        color: avatar.color,
+      },
+      benefits: benefits.map((benefit) => {
+        const config = configMap.get(`${avatar.id}-${benefit.id}`);
+        return {
+          benefitId: benefit.id,
+          benefitName: benefit.name,
+          benefitCode: benefit.code,
+          benefitIcon: benefit.icon,
+          status: config?.status || 'FREE',
+          pointCost: config?.pointCost || 0,
+          isEnabled: config?.isEnabled ?? true,
+          configId: config?.id || null,
+        };
+      }),
+    }));
+
+    return {
+      avatars: avatars.map((a) => ({
+        id: a.id,
+        code: a.code,
+        name: a.name,
+        emoji: a.emoji,
+        color: a.color,
+      })),
+      benefits: benefits.map((b) => ({
+        id: b.id,
+        code: b.code,
+        name: b.name,
+        icon: b.icon,
+        type: b.type,
+      })),
+      matrix,
+    };
+  }
+
+  @Put('matrix')
+  @ApiOperation({ summary: 'Update multiple avatar x benefit configurations' })
+  async updateMatrix(
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() dto: { configs: Array<{ avatarId: string; benefitId: string; status: string; pointCost: number; isEnabled: boolean }> },
+  ) {
+    const results = await Promise.all(
+      dto.configs.map(async (config) => {
+        return this.prisma.avatarBenefitConfig.upsert({
+          where: {
+            tenantId_avatarId_benefitId: {
+              tenantId,
+              avatarId: config.avatarId,
+              benefitId: config.benefitId,
+            },
+          },
+          create: {
+            tenantId,
+            avatarId: config.avatarId,
+            benefitId: config.benefitId,
+            status: config.status,
+            pointCost: config.pointCost,
+            isEnabled: config.isEnabled,
+          },
+          update: {
+            status: config.status,
+            pointCost: config.pointCost,
+            isEnabled: config.isEnabled,
+          },
+        });
+      }),
+    );
+
+    return { updated: results.length };
+  }
+
+  @Put(':avatarId/:benefitId')
+  @ApiOperation({ summary: 'Update a single avatar x benefit configuration' })
+  async updateConfig(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('avatarId') avatarId: string,
+    @Param('benefitId') benefitId: string,
+    @Body() dto: { status?: string; pointCost?: number; isEnabled?: boolean },
+  ) {
+    // Verify avatar and benefit exist
+    const [avatar, benefit] = await Promise.all([
+      this.prisma.participantAvatar.findFirst({ where: { id: avatarId, tenantId } }),
+      this.prisma.subscriberBenefit.findFirst({ where: { id: benefitId, tenantId } }),
+    ]);
+
+    if (!avatar) throw new HttpException({ error: 'AVATAR_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    if (!benefit) throw new HttpException({ error: 'BENEFIT_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    const config = await this.prisma.avatarBenefitConfig.upsert({
+      where: {
+        tenantId_avatarId_benefitId: { tenantId, avatarId, benefitId },
+      },
+      create: {
+        tenantId,
+        avatarId,
+        benefitId,
+        status: dto.status || 'FREE',
+        pointCost: dto.pointCost || 0,
+        isEnabled: dto.isEnabled ?? true,
+      },
+      update: {
+        status: dto.status,
+        pointCost: dto.pointCost,
+        isEnabled: dto.isEnabled,
+      },
+      include: {
+        avatar: { select: { id: true, code: true, name: true, emoji: true, color: true } },
+        benefit: { select: { id: true, code: true, name: true, icon: true } },
+      },
+    });
+
+    return config;
+  }
+
+  @Get(':avatarId/:benefitId')
+  @ApiOperation({ summary: 'Get a single avatar x benefit configuration' })
+  async getConfig(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('avatarId') avatarId: string,
+    @Param('benefitId') benefitId: string,
+  ) {
+    const config = await this.prisma.avatarBenefitConfig.findUnique({
+      where: {
+        tenantId_avatarId_benefitId: { tenantId, avatarId, benefitId },
+      },
+      include: {
+        avatar: { select: { id: true, code: true, name: true, emoji: true, color: true } },
+        benefit: { select: { id: true, code: true, name: true, icon: true } },
+      },
+    });
+
+    if (!config) {
+      // Return default values if no config exists
+      return {
+        avatarId,
+        benefitId,
+        status: 'FREE',
+        pointCost: 0,
+        isEnabled: true,
+      };
+    }
+
+    return config;
   }
 }

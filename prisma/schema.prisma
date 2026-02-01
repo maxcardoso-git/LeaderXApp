@@ -1064,7 +1064,8 @@ model SubscriberBenefit {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  planBenefits PlanBenefit[]
+  planBenefits      PlanBenefit[]
+  avatarBenefitConfigs AvatarBenefitConfig[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1170,6 +1171,7 @@ model Cycle {
   code        String
   name        String
   description String?
+  pipelineId  String?   @map("pipeline_id")
   startDate   DateTime  @map("start_date")
   endDate     DateTime  @map("end_date")
   isCurrent   Boolean   @default(false) @map("is_current")
@@ -1178,10 +1180,13 @@ model Cycle {
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @updatedAt @map("updated_at")
 
+  pipeline    PlmPipeline? @relation(fields: [pipelineId], references: [id])
+
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, isCurrent])
+  @@index([pipelineId])
   @@map("cycles")
 }
 
@@ -1219,11 +1224,35 @@ model ParticipantAvatar {
 
   // Relations
   stageAvatarRules PlmStageAvatarRule[]
+  benefitConfigs   AvatarBenefitConfig[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
   @@index([tenantId, displayOrder])
   @@map("participant_avatars")
+}
+
+/// AvatarBenefitConfig - configuration of point costs for avatar x benefit combinations
+model AvatarBenefitConfig {
+  id         String   @id @default(uuid())
+  tenantId   String   @map("tenant_id")
+  avatarId   String   @map("avatar_id")
+  benefitId  String   @map("benefit_id")
+  status     String   @default("FREE") // FREE | POINTS | BLOCKED
+  pointCost  Int      @default(0) @map("point_cost")
+  isEnabled  Boolean  @default(true) @map("is_enabled")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  avatar  ParticipantAvatar @relation(fields: [avatarId], references: [id], onDelete: Cascade)
+  benefit SubscriberBenefit @relation(fields: [benefitId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, avatarId, benefitId])
+  @@index([tenantId])
+  @@index([tenantId, avatarId])
+  @@index([tenantId, benefitId])
+  @@map("avatar_benefit_configs")
 }
 
 /// Supplier - external suppliers/vendors
@@ -1572,6 +1601,7 @@ model PlmPipeline {
   versions    PlmPipelineVersion[]
   cards       PlmCard[]
   permissions PlmPipelinePermission[]
+  cycles      Cycle[]
 
   @@unique([tenantId, key])
   @@index([tenantId])
