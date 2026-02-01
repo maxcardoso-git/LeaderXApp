@@ -2094,3 +2094,41 @@ model GovApprovalHistory {
   @@index([requestId, changedAt])
   @@map("gov_approval_history")
 }
+
+// ============================================
+// SYSTEM DOMAIN - Resource Registry
+// ============================================
+
+/// SystemResource - External API resources (LLMs, REST APIs, etc.)
+model SystemResource {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  name            String
+  type            String    // API_HTTP_OUTBOUND | API_HTTP_INBOUND | DATABASE | MESSAGE_QUEUE | STORAGE
+  subtype         String    // LLM | REST | GRAPHQL | WEBHOOK | POSTGRES | MYSQL | MONGODB | REDIS | S3 | OTHER
+  endpoint        String
+  httpMethod      String    @map("http_method") // GET | POST | PUT | PATCH | DELETE
+  authMode        String    @default("NONE") @map("auth_mode") // NONE | API_KEY | BEARER_TOKEN | BASIC_AUTH | OAUTH2
+  apiKeyConfig    Json?     @map("api_key_config") // { apiKey, headerName, location }
+  bearerConfig    Json?     @map("bearer_config") // { token }
+  basicAuthConfig Json?     @map("basic_auth_config") // { username, password }
+  oauth2Config    Json?     @map("oauth2_config") // { clientId, clientSecret, tokenUrl, scope }
+  llmConfig       Json?     @map("llm_config") // { provider, model, description }
+  connection      Json?     // Generic connection config
+  configuration   Json?     // Generic configuration
+  metadata        Json?
+  tags            String[]  @default([])
+  environment     String    @default("DEV") // DEV | STAGING | PROD
+  status          String    @default("UNKNOWN") // AVAILABLE | UNAVAILABLE | DEGRADED | UNKNOWN
+  lastTestedAt    DateTime? @map("last_tested_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, type])
+  @@index([tenantId, subtype])
+  @@index([tenantId, environment])
+  @@index([tenantId, status])
+  @@map("system_resources")
+}

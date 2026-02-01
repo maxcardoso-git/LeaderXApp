@@ -43,6 +43,9 @@ import { FormStudioModule } from './domains/form-studio';
 // PLM Domain
 import { PlmModule } from './domains/plm';
 
+// System Domain
+import { SystemModule } from './domains/system';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -59,6 +62,7 @@ import { PlmModule } from './domains/plm';
     SettingsModule,
     FormStudioModule,
     PlmModule,
+    SystemModule,
   ],
   controllers: [ApprovalsController],
   providers: [
