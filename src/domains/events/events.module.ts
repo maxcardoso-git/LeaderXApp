@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/persistence/prisma.service';
+import { GovernanceModule } from '../governance/governance.module';
 
 // Domain Services
 import {
@@ -87,6 +88,7 @@ const publicUseCases = [
 ];
 
 @Module({
+  imports: [GovernanceModule],
   controllers: [AdminEventsController, PublicEventsController],
   providers: [
     PrismaService,

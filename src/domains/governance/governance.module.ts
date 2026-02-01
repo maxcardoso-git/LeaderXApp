@@ -28,6 +28,12 @@ import {
   ListAuditLogsUseCase,
 } from './application/usecases';
 
+// Services
+import { ApprovalService } from './application/services';
+
+// Jobs
+import { ApprovalWorkerJob } from './application/jobs';
+
 // Controllers
 import {
   GovernanceController,
@@ -68,12 +74,15 @@ const useCases = [
   providers: [
     PrismaService,
     PolicyEnforcerService,
+    ApprovalService,
+    ApprovalWorkerJob,
     ...repositories,
     ...useCases,
   ],
   exports: [
     GOVERNANCE_POLICY_REPOSITORY,
     PolicyEnforcerService,
+    ApprovalService,
   ],
 })
 export class GovernanceModule {}

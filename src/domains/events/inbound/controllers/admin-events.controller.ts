@@ -19,6 +19,7 @@ import {
 } from '../../application/usecases/admin';
 import { GetEventDetailsUseCase } from '../../application/usecases/public';
 import { EventAggregate } from '../../domain/aggregates';
+import { ApprovalService } from '../../../governance/application/services';
 
 @ApiTags('Admin Events')
 @Controller('admin/events')
@@ -46,6 +47,7 @@ export class AdminEventsController {
     private readonly removeSeat: RemoveEventSeatUseCase,
     private readonly bindPolicy: BindPolicyUseCase,
     private readonly unbindPolicy: UnbindPolicyUseCase,
+    private readonly approvalService: ApprovalService,
   ) {}
 
   private toEventResponse(event: EventAggregate): EventResponseDto {
@@ -202,7 +204,60 @@ export class AdminEventsController {
     @Headers('x-tenant-id') tenantId: string,
     @Headers('x-actor-id') actorId: string,
     @Param('eventId') eventId: string,
-  ): Promise<EventResponseDto> {
+  ): Promise<EventResponseDto | { status: string; message: string; approvalRequest: any }> {
+    // Check if there's an approval policy for EVENT + PUBLISH
+    const { requiresApproval, policy } = await this.approvalService.checkRequiresApproval(
+      tenantId,
+      'EVENT',
+      'PUBLISH',
+    );
+
+    if (requiresApproval && policy) {
+      // Get event details for the approval request
+      const event = await this.getEventDetails.execute({ tenantId, eventId });
+
+      // Create approval request with PLM card
+      const approvalResult = await this.approvalService.createApprovalRequest({
+        tenantId,
+        entityType: 'EVENT',
+        entityId: eventId,
+        action: 'PUBLISH',
+        title: `Publicar Evento: ${event.name}`,
+        description: `Solicitação de aprovação para publicar o evento "${event.name}"`,
+        context: {
+          eventName: event.name,
+          startsAt: event.startsAt,
+          endsAt: event.endsAt,
+        },
+        snapshot: {
+          eventId: event.id,
+          eventName: event.name,
+          status: event.status,
+        },
+        requestedBy: actorId,
+      });
+
+      // Update event metadata with approval info
+      await this.updateEvent.execute({
+        tenantId,
+        eventId,
+        actorId,
+        metadata: {
+          ...((event.metadata as object) || {}),
+          approvalRequestId: approvalResult.request.id,
+          approvalCardId: approvalResult.card?.id,
+          pendingApprovalSince: new Date().toISOString(),
+        },
+      });
+
+      return {
+        status: 'PENDING_APPROVAL',
+        message: 'Evento enviado para aprovação. Um card foi criado no pipeline de aprovação.',
+        approvalRequest: approvalResult,
+      };
+    }
+
+    // No approval required - publish directly
     const { event } = await this.publishEvent.execute({ tenantId, eventId, actorId });
     return this.toEventResponse(event);
   }

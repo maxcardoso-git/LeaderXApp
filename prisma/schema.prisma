@@ -2064,10 +2064,13 @@ model GovApprovalRequest {
   decisionReason  String?   @map("decision_reason")
   context         Json      @default("{}") // Request context/metadata
   snapshot        Json      @default("{}") // Entity state snapshot at request time
-  correlationId   String?   @map("correlation_id")
-  idempotencyKey  String?   @map("idempotency_key")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
+  correlationId    String?   @map("correlation_id")
+  idempotencyKey   String?   @map("idempotency_key")
+  resolvedAt       DateTime? @map("resolved_at") // When the request was approved/rejected
+  actionExecuted   Boolean   @default(false) @map("action_executed") // Whether the action was executed by the worker
+  actionExecutedAt DateTime? @map("action_executed_at") // When the action was executed
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
 
   // Relations
   policy    GovApprovalPolicy?    @relation(fields: [policyId], references: [id])

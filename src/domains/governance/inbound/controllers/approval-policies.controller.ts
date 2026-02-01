@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
 import { PrismaService } from '@infrastructure/persistence/prisma.service';
+import { ApprovalService } from '../../application/services';
 
 // ============================================
 // DTOs & Types
@@ -412,7 +413,10 @@ export class ApprovalPoliciesController {
 @Controller('governance/approval-requests')
 @ApiHeader({ name: 'X-Tenant-Id', required: true })
 export class ApprovalRequestsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly approvalService: ApprovalService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new approval request' })
@@ -422,78 +426,29 @@ export class ApprovalRequestsController {
       entityType: string;
       entityId: string;
       action: string;
+      title?: string;
+      description?: string;
       policyId?: string;
       context?: any;
       snapshot?: any;
       requestedBy?: string;
     },
   ) {
-    // Find matching policy if not provided
-    let policy = null;
-    if (dto.policyId) {
-      policy = await this.prisma.govApprovalPolicy.findFirst({
-        where: { id: dto.policyId },
-      });
-      if (!policy) {
-        throw new HttpException({ error: 'POLICY_NOT_FOUND' }, HttpStatus.NOT_FOUND);
-      }
-    } else {
-      // Auto-match policy
-      const policies = await this.prisma.govApprovalPolicy.findMany({
-        where: {
-          entityType: dto.entityType,
-          action: dto.action,
-          enabled: true,
-          OR: [{ tenantId }, { tenantId: null }],
-        },
-        orderBy: { priority: 'asc' },
-      });
-      policy = policies[0] || null;
-    }
-
-    if (!policy) {
-      throw new HttpException(
-        { error: 'NO_MATCHING_POLICY', message: 'No approval policy matches this entity and action' },
-        HttpStatus.BAD_REQUEST,
-      );
-    }
-
-    // Generate unique request key
-    const requestKey = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // Create approval request
-    const request = await this.prisma.govApprovalRequest.create({
-      data: {
-        tenantId,
-        requestKey,
-        policyId: policy.id,
-        pipelineId: policy.pipelineId,
-        pipelineVersion: policy.pipelineVersion,
-        entityType: dto.entityType,
-        entityId: dto.entityId,
-        action: dto.action,
-        status: 'PENDING',
-        blocking: policy.blocking,
-        requestedBy: dto.requestedBy || null,
-        context: dto.context || {},
-        snapshot: dto.snapshot || {},
-      },
+    // Use ApprovalService to create request with PLM card
+    const result = await this.approvalService.createApprovalRequest({
+      tenantId,
+      entityType: dto.entityType,
+      entityId: dto.entityId,
+      action: dto.action,
+      title: dto.title || `Aprovação: ${dto.action} ${dto.entityType}`,
+      description: dto.description,
+      policyId: dto.policyId,
+      context: dto.context,
+      snapshot: dto.snapshot,
+      requestedBy: dto.requestedBy,
     });
 
-    // Create initial history entry
-    await this.prisma.govApprovalHistory.create({
-      data: {
-        tenantId,
-        requestId: request.id,
-        fromStatus: null,
-        toStatus: 'PENDING',
-        changedBy: dto.requestedBy || null,
-      },
-    });
-
-    // TODO: Create PLM card for this request (phase 2)
-
-    return request;
+    return result;
   }
 
   @Get()
