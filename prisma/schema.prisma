@@ -1497,6 +1497,7 @@ model FormDataSource {
   name             String
   description      String?
   formDefinitionId String?   @unique @map("form_definition_id") // Links to DataEntryForm (one-to-one)
+  lookupFieldId    String?   @map("lookup_field_id") // Field ID from form used for lookup/search
   createdBy        String?   @map("created_by")
   createdAt        DateTime  @default(now()) @map("created_at")
   updatedAt        DateTime  @updatedAt @map("updated_at")
@@ -1531,6 +1532,21 @@ model FormDataSourceEntry {
   @@index([tenantId, formDefinitionId])
   @@index([submittedAt])
   @@map("form_data_source_entries")
+}
+
+/// FormDataView - Saved query configurations for multi-source data views
+model FormDataView {
+  id          String   @id @default(uuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?
+  config      Json     // Stores query configuration (sources, joins, filters)
+  createdBy   String?  @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([tenantId])
+  @@map("form_data_views")
 }
 
 // ============================================

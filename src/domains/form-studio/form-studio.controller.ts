@@ -750,7 +750,7 @@ export class DataSourcesController {
   @ApiOperation({ summary: 'Create a new data source' })
   async create(
     @Headers('x-tenant-id') tenantId: string,
-    @Body() dto: { name: string; description?: string; formDefinitionId?: string },
+    @Body() dto: { name: string; description?: string; formDefinitionId?: string; lookupFieldId?: string },
   ) {
     // If formDefinitionId is provided, verify it exists and is not already connected
     if (dto.formDefinitionId) {
@@ -779,6 +779,7 @@ export class DataSourcesController {
         name: dto.name,
         description: dto.description || null,
         formDefinitionId: dto.formDefinitionId || null,
+        lookupFieldId: dto.lookupFieldId || null,
       },
       include: {
         _count: { select: { entries: true } },
@@ -871,7 +872,7 @@ export class DataSourcesController {
   async update(
     @Headers('x-tenant-id') tenantId: string,
     @Param('id') id: string,
-    @Body() dto: { name?: string; description?: string; formDefinitionId?: string },
+    @Body() dto: { name?: string; description?: string; formDefinitionId?: string; lookupFieldId?: string },
   ) {
     const existing = await this.prisma.formDataSource.findFirst({ where: { id, tenantId } });
     if (!existing) {
@@ -906,6 +907,7 @@ export class DataSourcesController {
         name: dto.name ?? existing.name,
         description: dto.description !== undefined ? dto.description : existing.description,
         formDefinitionId: dto.formDefinitionId !== undefined ? (dto.formDefinitionId || null) : existing.formDefinitionId,
+        lookupFieldId: dto.lookupFieldId !== undefined ? (dto.lookupFieldId || null) : existing.lookupFieldId,
       },
       include: {
         _count: { select: { entries: true } },
@@ -985,6 +987,48 @@ export class DataSourcesController {
     return { items, page: Number(page), size: Number(size), total };
   }
 
+  @Get(':id/entries/search')
+  @ApiOperation({ summary: 'Search entries by field value' })
+  async searchEntries(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Query('field') field: string,
+    @Query('value') value: string,
+    @Query('page') page = 1,
+    @Query('size') size = 20,
+  ): Promise<PaginatedResponse<any>> {
+    const dataSource = await this.prisma.formDataSource.findFirst({ where: { id, tenantId } });
+    if (!dataSource) {
+      throw new HttpException({ error: 'DATA_SOURCE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    if (!field || !value) {
+      throw new HttpException({ error: 'FIELD_AND_VALUE_REQUIRED' }, HttpStatus.BAD_REQUEST);
+    }
+
+    // Search in JSON data field using Prisma's JSON filtering
+    const skip = (page - 1) * size;
+
+    // Get all entries and filter in memory (Prisma JSON contains search)
+    const allEntries = await this.prisma.formDataSourceEntry.findMany({
+      where: { dataSourceId: id, tenantId },
+      orderBy: [{ submittedAt: 'desc' }],
+    });
+
+    // Filter entries where data[field] contains value (case-insensitive)
+    const filteredEntries = allEntries.filter((entry) => {
+      const data = entry.data as Record<string, unknown>;
+      const fieldValue = data[field];
+      if (fieldValue === undefined || fieldValue === null) return false;
+      return String(fieldValue).toLowerCase().includes(value.toLowerCase());
+    });
+
+    const total = filteredEntries.length;
+    const items = filteredEntries.slice(skip, skip + Number(size));
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
   @Get(':id/entries/:entryId')
   @ApiOperation({ summary: 'Get entry by ID' })
   async getEntryById(
@@ -1041,6 +1085,31 @@ export class DataSourcesController {
     });
   }
 
+  @Put(':id/entries/:entryId')
+  @ApiOperation({ summary: 'Update entry in data source' })
+  async updateEntry(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Param('entryId') entryId: string,
+    @Body() dto: { data: any; submittedBy?: string; submittedByName?: string },
+  ) {
+    const entry = await this.prisma.formDataSourceEntry.findFirst({
+      where: { id: entryId, dataSourceId: id, tenantId },
+    });
+    if (!entry) {
+      throw new HttpException({ error: 'ENTRY_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    return this.prisma.formDataSourceEntry.update({
+      where: { id: entryId },
+      data: {
+        data: dto.data,
+        submittedBy: dto.submittedBy ?? entry.submittedBy,
+        submittedByName: dto.submittedByName ?? entry.submittedByName,
+      },
+    });
+  }
+
   @Delete(':id/entries/:entryId')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Delete entry' })
@@ -1058,5 +1127,225 @@ export class DataSourcesController {
 
     await this.prisma.formDataSourceEntry.delete({ where: { id: entryId } });
     return entry;
+  }
+}
+
+// ============================================
+// VIEWS CONTROLLER
+// ============================================
+
+@ApiTags('Form Studio - Views')
+@Controller('form-studio/views')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class ViewsController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new view' })
+  async create(
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() dto: { name: string; description?: string; config: any; createdBy?: string },
+  ) {
+    return this.prisma.formDataView.create({
+      data: {
+        tenantId,
+        name: dto.name,
+        description: dto.description || null,
+        config: dto.config,
+        createdBy: dto.createdBy || null,
+      },
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List views' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 25,
+    @Query('search') search?: string,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * size;
+    const where: any = { tenantId };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.formDataView.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: [{ updatedAt: 'desc' }],
+      }),
+      this.prisma.formDataView.count({ where }),
+    ]);
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get view by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const view = await this.prisma.formDataView.findFirst({
+      where: { id, tenantId },
+    });
+    if (!view) {
+      throw new HttpException({ error: 'VIEW_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+    return view;
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update view' })
+  async update(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: { name?: string; description?: string; config?: any },
+  ) {
+    const existing = await this.prisma.formDataView.findFirst({ where: { id, tenantId } });
+    if (!existing) {
+      throw new HttpException({ error: 'VIEW_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    return this.prisma.formDataView.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        description: dto.description !== undefined ? dto.description : existing.description,
+        config: dto.config ?? existing.config,
+      },
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete view' })
+  async delete(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const existing = await this.prisma.formDataView.findFirst({ where: { id, tenantId } });
+    if (!existing) {
+      throw new HttpException({ error: 'VIEW_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    await this.prisma.formDataView.delete({ where: { id } });
+    return existing;
+  }
+
+  @Post(':id/execute')
+  @ApiOperation({ summary: 'Execute view query' })
+  async execute(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Query('page') page = 1,
+    @Query('size') size = 50,
+  ): Promise<PaginatedResponse<any>> {
+    const view = await this.prisma.formDataView.findFirst({ where: { id, tenantId } });
+    if (!view) {
+      throw new HttpException({ error: 'VIEW_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    const config = view.config as {
+      sources: { id: string; dataSourceId: string; alias: string; fields: string[] }[];
+      joins: { leftSourceAlias: string; leftField: string; rightSourceAlias: string; rightField: string; type: string }[];
+      filters: { sourceAlias: string; field: string; operator: string; value?: string }[];
+      orderBy?: { sourceAlias: string; field: string; direction: string };
+      limit?: number;
+    };
+
+    // Load all entries for each source
+    const sourceData: Record<string, any[]> = {};
+    for (const source of config.sources) {
+      const entries = await this.prisma.formDataSourceEntry.findMany({
+        where: { dataSourceId: source.dataSourceId, tenantId },
+      });
+      sourceData[source.alias] = entries.map((e) => ({
+        _id: e.id,
+        _submittedAt: e.submittedAt,
+        _submittedBy: e.submittedByName || e.submittedBy,
+        ...(e.data as Record<string, unknown>),
+      }));
+    }
+
+    // Start with first source
+    let results: any[] = [];
+    if (config.sources.length > 0) {
+      const firstSource = config.sources[0];
+      results = sourceData[firstSource.alias].map((entry) => ({
+        [firstSource.alias]: entry,
+      }));
+    }
+
+    // Apply joins
+    for (const join of config.joins) {
+      const rightData = sourceData[join.rightSourceAlias] || [];
+      const newResults: any[] = [];
+
+      for (const row of results) {
+        const leftValue = row[join.leftSourceAlias]?.[join.leftField];
+        const matches = rightData.filter((r) => r[join.rightField] === leftValue);
+
+        if (join.type === 'inner') {
+          for (const match of matches) {
+            newResults.push({ ...row, [join.rightSourceAlias]: match });
+          }
+        } else if (join.type === 'left') {
+          if (matches.length > 0) {
+            for (const match of matches) {
+              newResults.push({ ...row, [join.rightSourceAlias]: match });
+            }
+          } else {
+            newResults.push({ ...row, [join.rightSourceAlias]: null });
+          }
+        }
+      }
+      results = newResults;
+    }
+
+    // Apply filters
+    for (const filter of config.filters) {
+      results = results.filter((row) => {
+        const value = row[filter.sourceAlias]?.[filter.field];
+        switch (filter.operator) {
+          case 'equals':
+            return value === filter.value;
+          case 'contains':
+            return String(value || '').toLowerCase().includes((filter.value || '').toLowerCase());
+          case 'greater':
+            return Number(value) > Number(filter.value);
+          case 'less':
+            return Number(value) < Number(filter.value);
+          case 'not_empty':
+            return value !== null && value !== undefined && value !== '';
+          case 'empty':
+            return value === null || value === undefined || value === '';
+          default:
+            return true;
+        }
+      });
+    }
+
+    // Apply ordering
+    if (config.orderBy) {
+      const { sourceAlias, field, direction } = config.orderBy;
+      results.sort((a, b) => {
+        const aVal = a[sourceAlias]?.[field];
+        const bVal = b[sourceAlias]?.[field];
+        if (aVal < bVal) return direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    // Pagination
+    const total = results.length;
+    const skip = (page - 1) * size;
+    const limit = config.limit ? Math.min(Number(size), config.limit) : Number(size);
+    const items = results.slice(skip, skip + limit);
+
+    return { items, page: Number(page), size: limit, total };
   }
 }
