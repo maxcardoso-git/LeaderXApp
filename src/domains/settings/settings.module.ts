@@ -4,6 +4,7 @@ import { SettingsController } from './settings.controller';
 import { CategoriesController, SegmentsController, LinesController, ClassificationsController, ProgramsController, SubscriberBenefitsController, EventTypesController, EventVenuesController, TableNamesController, AvatarsController } from './taxonomy.controller';
 import { CyclesController, AvatarBenefitConfigController } from './workflow.controller';
 import { SuppliersController, IntegrationsController } from './suppliers.controller';
+import { RegistrationPointsController } from './registration-points.controller';
 
 @Module({
   controllers: [
@@ -22,6 +23,8 @@ import { SuppliersController, IntegrationsController } from './suppliers.control
     // Workflow
     CyclesController,
     AvatarBenefitConfigController,
+    // Registration
+    RegistrationPointsController,
     // Suppliers
     SuppliersController,
     IntegrationsController,

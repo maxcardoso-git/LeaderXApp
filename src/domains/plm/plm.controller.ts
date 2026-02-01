@@ -541,6 +541,7 @@ export class StagesController {
         color: dto.color || '#6B7280',
         isInitial: dto.isInitial || false,
         isFinal: dto.isFinal || false,
+        approvalOutcome: dto.approvalOutcome || null, // APPROVE, REJECT, CANCEL
         wipLimit: dto.wipLimit,
         slaHours: dto.slaHours,
         active: dto.active !== false,
@@ -733,6 +734,7 @@ export class StagesController {
         color: dto.color ?? stage.color,
         isInitial: dto.isInitial ?? stage.isInitial,
         isFinal: dto.isFinal ?? stage.isFinal,
+        approvalOutcome: dto.approvalOutcome !== undefined ? dto.approvalOutcome : stage.approvalOutcome,
         wipLimit: dto.wipLimit !== undefined ? dto.wipLimit : stage.wipLimit,
         slaHours: dto.slaHours !== undefined ? dto.slaHours : stage.slaHours,
         active: dto.active ?? stage.active,

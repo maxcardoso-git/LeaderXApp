@@ -869,6 +869,36 @@ model TenantSettings {
   @@map("tenant_settings")
 }
 
+/// RegistrationBlockPoints - points configuration for registration profile blocks
+model RegistrationBlockPoints {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  blockKey     String   @map("block_key") // address, dietary_restrictions, personal_data, etc.
+  blockName    String   @map("block_name")
+  points       Int      @default(0)
+  active       Boolean  @default(true)
+  sortOrder    Int      @default(0) @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, blockKey])
+  @@index([tenantId])
+  @@index([tenantId, active])
+  @@map("registration_block_points")
+}
+
+/// RegistrationBonusSettings - bonus points for completing all registration blocks
+model RegistrationBonusSettings {
+  id           String   @id @default(uuid())
+  tenantId     String   @unique @map("tenant_id")
+  bonusPoints  Int      @default(500) @map("bonus_points")
+  targetTotal  Int      @default(500) @map("target_total") // Meta total de pontos dos blocos
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("registration_bonus_settings")
+}
+
 // ============================================
 // TAXONOMY DOMAIN
 // ============================================
@@ -1645,6 +1675,7 @@ model PlmStage {
   color             String   @default("#6B7280")
   isInitial         Boolean  @default(false) @map("is_initial")
   isFinal           Boolean  @default(false) @map("is_final")
+  approvalOutcome   String?  @map("approval_outcome") // APPROVE, REJECT, CANCEL - used by governance workflow
   wipLimit          Int?     @map("wip_limit") // Work-in-progress limit
   slaHours          Int?     @map("sla_hours")
   active            Boolean  @default(true)

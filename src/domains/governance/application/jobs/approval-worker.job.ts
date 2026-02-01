@@ -126,20 +126,41 @@ export class ApprovalWorkerJob {
         if (!card) continue;
 
         const stage = card.currentStage;
-        const isApproved = stage?.isFinal === true;
-        const isRejected =
-          stage?.name?.toLowerCase().includes('rejeit') ||
-          stage?.name?.toLowerCase().includes('reject') ||
-          stage?.classification === 'CANCELED';
 
+        // Use explicit approvalOutcome field (preferred)
+        // Fallback to legacy logic for backwards compatibility
         let newStatus = request.status;
-        if (isApproved && !isRejected) {
-          newStatus = 'APPROVED';
-        } else if (isRejected) {
-          newStatus = 'REJECTED';
-        } else if (card.status === 'CLOSED' && !isApproved) {
-          newStatus = 'REJECTED';
-        } else if (request.status === 'PENDING') {
+
+        if (stage?.approvalOutcome) {
+          // New explicit approach: use approvalOutcome field
+          switch (stage.approvalOutcome) {
+            case 'APPROVE':
+              newStatus = 'APPROVED';
+              break;
+            case 'REJECT':
+            case 'CANCEL':
+              newStatus = 'REJECTED';
+              break;
+          }
+        } else {
+          // Legacy fallback: detect by stage properties
+          const isApproved = stage?.isFinal === true;
+          const isRejected =
+            stage?.name?.toLowerCase().includes('rejeit') ||
+            stage?.name?.toLowerCase().includes('reject') ||
+            stage?.classification === 'CANCELED';
+
+          if (isApproved && !isRejected) {
+            newStatus = 'APPROVED';
+          } else if (isRejected) {
+            newStatus = 'REJECTED';
+          } else if (card.status === 'CLOSED' && !isApproved) {
+            newStatus = 'REJECTED';
+          }
+        }
+
+        // If still pending and card exists, mark as in progress
+        if (newStatus === request.status && request.status === 'PENDING') {
           newStatus = 'IN_PROGRESS';
         }
 
