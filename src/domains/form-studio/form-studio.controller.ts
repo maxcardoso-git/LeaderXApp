@@ -200,15 +200,27 @@ export class FormsController {
       throw new HttpException({ error: 'FORM_ALREADY_PUBLISHED' }, HttpStatus.BAD_REQUEST);
     }
 
-    // Create version snapshot
-    await this.prisma.formVersion.create({
-      data: {
+    // Create or update version snapshot (upsert to handle republishing from TESTING)
+    await this.prisma.formVersion.upsert({
+      where: {
+        formId_version: {
+          formId: id,
+          version: form.version,
+        },
+      },
+      create: {
         tenantId,
         formId: id,
         version: form.version,
         schema: { fields: form.fields, layout: form.layout, validationRules: form.validationRules },
         changelog: dto.changelog || null,
         publishedBy: dto.publishedBy || 'system',
+      },
+      update: {
+        schema: { fields: form.fields, layout: form.layout, validationRules: form.validationRules },
+        changelog: dto.changelog || null,
+        publishedBy: dto.publishedBy || 'system',
+        publishedAt: new Date(),
       },
     });
 
