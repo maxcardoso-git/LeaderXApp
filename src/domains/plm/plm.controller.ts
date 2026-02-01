@@ -290,6 +290,44 @@ export class PipelinesController {
     });
   }
 
+  @Post(':id/unpublish')
+  @ApiOperation({ summary: 'Unpublish pipeline version (back to draft)' })
+  async unpublish(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const pipeline = await this.prisma.plmPipeline.findFirst({
+      where: { id, tenantId },
+      include: { versions: { orderBy: { versionNumber: 'desc' }, take: 1 } },
+    });
+    if (!pipeline) throw new HttpException({ error: 'PIPELINE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    if (pipeline.lifecycleStatus !== 'PUBLISHED') {
+      throw new HttpException({ error: 'PIPELINE_NOT_PUBLISHED' }, HttpStatus.BAD_REQUEST);
+    }
+
+    const latestVersion = pipeline.versions[0];
+    if (!latestVersion) {
+      throw new HttpException({ error: 'NO_VERSION_FOUND' }, HttpStatus.BAD_REQUEST);
+    }
+
+    // Update version status back to DRAFT
+    await this.prisma.plmPipelineVersion.update({
+      where: { id: latestVersion.id },
+      data: {
+        versionStatus: 'DRAFT',
+        publishedAt: null,
+        publishedBy: null,
+      },
+    });
+
+    // Update pipeline status back to DRAFT
+    return this.prisma.plmPipeline.update({
+      where: { id },
+      data: {
+        lifecycleStatus: 'DRAFT',
+        publishedVersion: null,
+      },
+    });
+  }
+
   @Post(':id/test')
   @ApiOperation({ summary: 'Move pipeline to test status' })
   async setTestStatus(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
