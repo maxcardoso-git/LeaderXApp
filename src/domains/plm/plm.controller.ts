@@ -233,6 +233,55 @@ export class PipelinesController {
     return existing;
   }
 
+  @Post(':id/clone')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Clone a pipeline' })
+  async clone(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: { key: string; name: string; description?: string; projectName?: string },
+  ) {
+    // Get original pipeline
+    const originalPipeline = await this.prisma.plmPipeline.findFirst({
+      where: { id, tenantId },
+    });
+    if (!originalPipeline) throw new HttpException({ error: 'PIPELINE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Validate unique key
+    const existing = await this.prisma.plmPipeline.findFirst({
+      where: { tenantId, key: dto.key },
+    });
+    if (existing) {
+      throw new HttpException({ error: 'PIPELINE_KEY_EXISTS' }, HttpStatus.BAD_REQUEST);
+    }
+
+    // Create cloned pipeline with new key/name but copy other properties
+    const clonedPipeline = await this.prisma.plmPipeline.create({
+      data: {
+        tenantId,
+        key: dto.key,
+        name: dto.name,
+        description: dto.description ?? originalPipeline.description,
+        projectId: originalPipeline.projectId,
+        projectName: dto.projectName ?? originalPipeline.projectName,
+        lifecycleStatus: 'DRAFT',
+        createdBy: originalPipeline.createdBy,
+      },
+    });
+
+    // Create initial version
+    await this.prisma.plmPipelineVersion.create({
+      data: {
+        tenantId,
+        pipelineId: clonedPipeline.id,
+        versionNumber: 1,
+        versionStatus: 'DRAFT',
+      },
+    });
+
+    return clonedPipeline;
+  }
+
   // ============================================
   // LIFECYCLE MANAGEMENT
   // ============================================
