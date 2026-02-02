@@ -2231,6 +2231,9 @@ model SystemResource {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
+  // Relations
+  capabilities SystemCapability[]
+
   @@unique([tenantId, name])
   @@index([tenantId])
   @@index([tenantId, type])
@@ -2238,4 +2241,42 @@ model SystemResource {
   @@index([tenantId, environment])
   @@index([tenantId, status])
   @@map("system_resources")
+}
+
+/// SystemCapability - Execution units that wrap SystemResource calls for workflow automation
+model SystemCapability {
+  id                String        @id @default(uuid())
+  tenantId          String        @map("tenant_id")
+  name              String
+  description       String?
+  code              String        // Unique code (e.g., "LLM_CALL", "CEP_LOOKUP")
+  systemResourceId  String        @map("system_resource_id")
+  systemResource    SystemResource @relation(fields: [systemResourceId], references: [id], onDelete: Cascade)
+
+  // Payload Schema Definition
+  inputSchema       Json?         @map("input_schema")  // JSON Schema for input validation
+  outputSchema      Json?         @map("output_schema") // JSON Schema for output validation
+
+  // Execution Configuration
+  timeout           Int?          // Timeout in milliseconds
+  retryPolicy       Json?         @map("retry_policy")  // { maxRetries, backoffMs }
+
+  // Workflow Integration
+  metadata          Json?         // Future: workflow trigger associations
+  tags              String[]      @default([])
+
+  // Status
+  isActive          Boolean       @default(true) @map("is_active")
+  lastTestedAt      DateTime?     @map("last_tested_at")
+  lastTestResult    String?       @map("last_test_result") // SUCCESS | FAILURE
+
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code])
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, systemResourceId])
+  @@index([tenantId, isActive])
+  @@map("system_capabilities")
 }

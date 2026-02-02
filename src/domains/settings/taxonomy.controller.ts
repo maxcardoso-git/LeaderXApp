@@ -1724,3 +1724,302 @@ export class AvatarTypesController {
     return existing;
   }
 }
+
+// ============================================
+// SYSTEM CAPABILITIES CONTROLLER
+// ============================================
+
+@ApiTags('Settings - System Capabilities')
+@Controller('settings/capabilities')
+@ApiHeader({ name: 'X-Tenant-Id', required: true })
+export class SystemCapabilitiesController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new system capability' })
+  async create(
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() dto: any,
+  ) {
+    // Check for duplicate name
+    const existingName = await this.prisma.systemCapability.findUnique({
+      where: { tenantId_name: { tenantId, name: dto.name } },
+    });
+    if (existingName) {
+      throw new HttpException(
+        { error: 'CAPABILITY_NAME_EXISTS', message: `Capability with name "${dto.name}" already exists` },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    // Check for duplicate code
+    const existingCode = await this.prisma.systemCapability.findUnique({
+      where: { tenantId_code: { tenantId, code: dto.code.toUpperCase() } },
+    });
+    if (existingCode) {
+      throw new HttpException(
+        { error: 'CAPABILITY_CODE_EXISTS', message: `Capability with code "${dto.code}" already exists` },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    // Verify SystemResource exists
+    const resource = await this.prisma.systemResource.findFirst({
+      where: { id: dto.systemResourceId, tenantId },
+    });
+    if (!resource) {
+      throw new HttpException(
+        { error: 'RESOURCE_NOT_FOUND', message: 'System Resource not found' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return this.prisma.systemCapability.create({
+      data: {
+        tenantId,
+        name: dto.name,
+        description: dto.description,
+        code: dto.code.toUpperCase(),
+        systemResourceId: dto.systemResourceId,
+        inputSchema: dto.inputSchema,
+        outputSchema: dto.outputSchema,
+        timeout: dto.timeout,
+        retryPolicy: dto.retryPolicy,
+        metadata: dto.metadata ?? {},
+        tags: dto.tags ?? [],
+        isActive: dto.isActive ?? true,
+      },
+      include: {
+        systemResource: true,
+      },
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List system capabilities' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 25,
+    @Query('search') search?: string,
+    @Query('systemResourceId') systemResourceId?: string,
+    @Query('isActive') isActive?: string,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * size;
+    const where: any = { tenantId };
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { code: { contains: search.toUpperCase(), mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (systemResourceId) {
+      where.systemResourceId = systemResourceId;
+    }
+
+    if (isActive !== undefined) {
+      where.isActive = isActive === 'true';
+    }
+
+    const [items, total] = await Promise.all([
+      this.prisma.systemCapability.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: [{ name: 'asc' }],
+        include: {
+          systemResource: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              subtype: true,
+              endpoint: true,
+            },
+          },
+        },
+      }),
+      this.prisma.systemCapability.count({ where }),
+    ]);
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get capability by ID' })
+  async getById(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+  ) {
+    const capability = await this.prisma.systemCapability.findFirst({
+      where: { id, tenantId },
+      include: {
+        systemResource: true,
+      },
+    });
+
+    if (!capability) {
+      throw new HttpException(
+        { error: 'CAPABILITY_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return capability;
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update capability' })
+  async update(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: any,
+  ) {
+    const existing = await this.prisma.systemCapability.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!existing) {
+      throw new HttpException(
+        { error: 'CAPABILITY_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Check name uniqueness if changed
+    if (dto.name && dto.name !== existing.name) {
+      const duplicate = await this.prisma.systemCapability.findUnique({
+        where: { tenantId_name: { tenantId, name: dto.name } },
+      });
+      if (duplicate) {
+        throw new HttpException(
+          { error: 'CAPABILITY_NAME_EXISTS' },
+          HttpStatus.CONFLICT,
+        );
+      }
+    }
+
+    // Verify SystemResource if changed
+    if (dto.systemResourceId && dto.systemResourceId !== existing.systemResourceId) {
+      const resource = await this.prisma.systemResource.findFirst({
+        where: { id: dto.systemResourceId, tenantId },
+      });
+      if (!resource) {
+        throw new HttpException(
+          { error: 'RESOURCE_NOT_FOUND' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+    }
+
+    return this.prisma.systemCapability.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        description: dto.description,
+        systemResourceId: dto.systemResourceId,
+        inputSchema: dto.inputSchema,
+        outputSchema: dto.outputSchema,
+        timeout: dto.timeout,
+        retryPolicy: dto.retryPolicy,
+        metadata: dto.metadata,
+        tags: dto.tags,
+        isActive: dto.isActive,
+      },
+      include: {
+        systemResource: true,
+      },
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete capability' })
+  async delete(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+  ) {
+    const existing = await this.prisma.systemCapability.findFirst({
+      where: { id, tenantId },
+    });
+
+    if (!existing) {
+      throw new HttpException(
+        { error: 'CAPABILITY_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // TODO: Check if capability is being used by workflow triggers
+    // For now, just delete
+
+    await this.prisma.systemCapability.delete({ where: { id } });
+  }
+
+  @Post(':id/test')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Test capability execution' })
+  async test(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: { payload: any },
+  ) {
+    const capability = await this.prisma.systemCapability.findFirst({
+      where: { id, tenantId },
+      include: { systemResource: true },
+    });
+
+    if (!capability) {
+      throw new HttpException(
+        { error: 'CAPABILITY_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    try {
+      // TODO: Implement actual execution logic
+      // This is a placeholder that would call the SystemResource with the payload
+      const startTime = Date.now();
+
+      // Simulate execution (replace with actual HTTP call to systemResource)
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const responseTime = Date.now() - startTime;
+      const testedAt = new Date();
+
+      // Update test results
+      await this.prisma.systemCapability.update({
+        where: { id },
+        data: {
+          lastTestedAt: testedAt,
+          lastTestResult: 'SUCCESS',
+        },
+      });
+
+      return {
+        success: true,
+        message: 'Capability executed successfully',
+        responseTime,
+        testedAt: testedAt.toISOString(),
+        result: { mock: true, payload: dto.payload },
+      };
+    } catch (error) {
+      await this.prisma.systemCapability.update({
+        where: { id },
+        data: {
+          lastTestedAt: new Date(),
+          lastTestResult: 'FAILURE',
+        },
+      });
+
+      return {
+        success: false,
+        message: error.message || 'Capability execution failed',
+        testedAt: new Date().toISOString(),
+      };
+    }
+  }
+}
