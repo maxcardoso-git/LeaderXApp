@@ -275,7 +275,7 @@ export class AdminEventsController {
     // Get original event
     const originalEvent = await this.getEventDetails.execute({ tenantId, eventId });
 
-    // Create cloned event with new name and dates
+    // Create cloned event with new name and dates (always as DRAFT)
     const { event } = await this.createEvent.execute({
       tenantId,
       actorId,
@@ -286,6 +286,7 @@ export class AdminEventsController {
       visibility: originalEvent.visibility,
       reservationMode: originalEvent.reservationMode,
       metadata: originalEvent.metadata,
+      status: 'DRAFT', // Always create cloned events as DRAFT
     });
 
     return this.toEventResponse(event);
