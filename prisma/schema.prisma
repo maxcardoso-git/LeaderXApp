@@ -1258,6 +1258,26 @@ model TableName {
   @@map("table_names")
 }
 
+/// AvatarType - types/categories for avatars (Operacional, Eventos, Rede, Nucleo, Grupo, etc)
+model AvatarType {
+  id           String   @id @default(uuid())
+  tenantId     String   @map("tenant_id")
+  name         String
+  icon         String?
+  color        String?
+  displayOrder Int?     @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  avatars ParticipantAvatar[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([tenantId, displayOrder])
+  @@map("avatar_types")
+}
+
 /// ParticipantAvatar - avatar types for event participants
 model ParticipantAvatar {
   id           String   @id @default(uuid())
@@ -1267,17 +1287,20 @@ model ParticipantAvatar {
   emoji        String
   color        String
   avatarUrl    String?  @map("avatar_url")
+  avatarTypeId String?  @map("avatar_type_id")
   isDefault    Boolean  @default(false) @map("is_default")
   displayOrder Int?     @map("display_order")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relations
+  avatarType       AvatarType?            @relation(fields: [avatarTypeId], references: [id])
   stageAvatarRules PlmStageAvatarRule[]
   benefitConfigs   AvatarBenefitConfig[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
+  @@index([tenantId, avatarTypeId])
   @@index([tenantId, displayOrder])
   @@map("participant_avatars")
 }

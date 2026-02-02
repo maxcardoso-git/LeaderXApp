@@ -1522,8 +1522,12 @@ export class AvatarsController {
         emoji: dto.emoji,
         color: dto.color,
         avatarUrl: dto.avatarUrl,
+        avatarTypeId: dto.avatarTypeId,
         isDefault: dto.isDefault ?? false,
         displayOrder: dto.displayOrder,
+      },
+      include: {
+        avatarType: true,
       },
     });
   }
@@ -1552,6 +1556,9 @@ export class AvatarsController {
         skip,
         take: Number(size),
         orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
+        include: {
+          avatarType: true,
+        },
       }),
       this.prisma.participantAvatar.count({ where }),
     ]);
@@ -1562,7 +1569,10 @@ export class AvatarsController {
   @Get(':id')
   @ApiOperation({ summary: 'Get avatar by ID' })
   async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
-    const avatar = await this.prisma.participantAvatar.findFirst({ where: { id, tenantId } });
+    const avatar = await this.prisma.participantAvatar.findFirst({
+      where: { id, tenantId },
+      include: { avatarType: true },
+    });
     if (!avatar) throw new HttpException({ error: 'AVATAR_NOT_FOUND' }, HttpStatus.NOT_FOUND);
     return avatar;
   }
@@ -1580,7 +1590,11 @@ export class AvatarsController {
         emoji: dto.emoji ?? existing.emoji,
         color: dto.color ?? existing.color,
         avatarUrl: dto.avatarUrl !== undefined ? dto.avatarUrl : existing.avatarUrl,
+        avatarTypeId: dto.avatarTypeId !== undefined ? dto.avatarTypeId : existing.avatarTypeId,
         displayOrder: dto.displayOrder !== undefined ? dto.displayOrder : existing.displayOrder,
+      },
+      include: {
+        avatarType: true,
       },
     });
   }
@@ -1602,3 +1616,111 @@ export class AvatarsController {
   }
 }
 
+
+// ============================================
+// AVATAR TYPES CONTROLLER
+// ============================================
+
+@Controller('settings/avatar-types')
+@ApiTags('Taxonomy - Avatar Types')
+export class AvatarTypesController {
+  constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new avatar type' })
+  async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
+    const existing = await this.prisma.avatarType.findUnique({
+      where: { tenantId_name: { tenantId, name: dto.name } },
+    });
+
+    if (existing) {
+      throw new HttpException({ error: 'AVATAR_TYPE_NAME_EXISTS' }, HttpStatus.CONFLICT);
+    }
+
+    return this.prisma.avatarType.create({
+      data: {
+        tenantId,
+        name: dto.name,
+        icon: dto.icon,
+        color: dto.color,
+        displayOrder: dto.displayOrder,
+      },
+    });
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'List avatar types' })
+  async list(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query('page') page = 1,
+    @Query('size') size = 100,
+  ): Promise<PaginatedResponse<any>> {
+    const skip = (page - 1) * size;
+    const where: any = { tenantId };
+
+    const [items, total] = await Promise.all([
+      this.prisma.avatarType.findMany({
+        where,
+        skip,
+        take: Number(size),
+        orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
+        include: {
+          _count: {
+            select: { avatars: true },
+          },
+        },
+      }),
+      this.prisma.avatarType.count({ where }),
+    ]);
+
+    return { items, page: Number(page), size: Number(size), total };
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get avatar type by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const avatarType = await this.prisma.avatarType.findFirst({ where: { id, tenantId } });
+    if (!avatarType) throw new HttpException({ error: 'AVATAR_TYPE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    return avatarType;
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update avatar type' })
+  async update(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: any) {
+    const existing = await this.prisma.avatarType.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'AVATAR_TYPE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    return this.prisma.avatarType.update({
+      where: { id },
+      data: {
+        name: dto.name ?? existing.name,
+        icon: dto.icon !== undefined ? dto.icon : existing.icon,
+        color: dto.color !== undefined ? dto.color : existing.color,
+        displayOrder: dto.displayOrder !== undefined ? dto.displayOrder : existing.displayOrder,
+      },
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete avatar type' })
+  async delete(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const existing = await this.prisma.avatarType.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new HttpException({ error: 'AVATAR_TYPE_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Check if avatar type is in use
+    const avatarsCount = await this.prisma.participantAvatar.count({
+      where: { avatarTypeId: id, tenantId },
+    });
+
+    if (avatarsCount > 0) {
+      throw new HttpException(
+        { error: 'AVATAR_TYPE_IN_USE', message: 'Cannot delete avatar type that is in use' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.prisma.avatarType.delete({ where: { id } });
+    return existing;
+  }
+}
