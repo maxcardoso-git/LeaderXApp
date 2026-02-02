@@ -365,10 +365,21 @@ export class TestConnectionUseCase {
           break;
       }
 
+      // Build request body for LLM resources
+      let body: string | undefined;
+      if (resource.subtype === ResourceSubtype.LLM && resource.httpMethod === HttpMethod.POST) {
+        const model = resource.llmConfig?.model || 'gpt-4o-mini';
+        body = JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: 'Test connection' }],
+        });
+      }
+
       // Make HTTP request
       const response = await fetch(resource.endpoint, {
         method: resource.httpMethod,
         headers,
+        body,
         signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
@@ -471,10 +482,21 @@ export class TestConnectionPreviewUseCase {
           break;
       }
 
+      // Build request body for LLM resources
+      let body: string | undefined;
+      if (input.subtype === ResourceSubtype.LLM && input.httpMethod === HttpMethod.POST) {
+        const model = input.llmConfig?.model || 'gpt-4o-mini';
+        body = JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: 'Test connection' }],
+        });
+      }
+
       // Make HTTP request
       const response = await fetch(input.endpoint, {
         method: input.httpMethod,
         headers,
+        body,
         signal: AbortSignal.timeout(10000), // 10 second timeout
       });
 
