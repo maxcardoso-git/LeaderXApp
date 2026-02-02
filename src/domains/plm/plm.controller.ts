@@ -1621,6 +1621,24 @@ export class CardsController {
     });
   }
 
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete card and all related data' })
+  async deleteCard(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+    const card = await this.prisma.plmCard.findFirst({ where: { id, tenantId } });
+    if (!card) throw new HttpException({ error: 'CARD_NOT_FOUND' }, HttpStatus.NOT_FOUND);
+
+    // Delete related data in order (due to foreign key constraints)
+    await this.prisma.plmTriggerExecution.deleteMany({ where: { cardId: id } });
+    await this.prisma.plmCardComment.deleteMany({ where: { cardId: id } });
+    await this.prisma.plmCardMoveHistory.deleteMany({ where: { cardId: id } });
+    await this.prisma.plmCardForm.deleteMany({ where: { cardId: id } });
+
+    // Delete the card
+    await this.prisma.plmCard.delete({ where: { id } });
+
+    return { success: true };
+  }
+
   // ============================================
   // CARD FORMS
   // ============================================
