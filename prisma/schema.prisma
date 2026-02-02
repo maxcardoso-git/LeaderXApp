@@ -2261,6 +2261,10 @@ model SystemCapability {
   timeout           Int?          // Timeout in milliseconds
   retryPolicy       Json?         @map("retry_policy")  // { maxRetries, backoffMs }
 
+  // Cache Configuration
+  cacheEnabled      Boolean       @default(false) @map("cache_enabled")
+  cacheExpirationHours Int?       @map("cache_expiration_hours") // Cache TTL in hours
+
   // Workflow Integration
   metadata          Json?         // Future: workflow trigger associations
   tags              String[]      @default([])
