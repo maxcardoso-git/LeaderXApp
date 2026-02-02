@@ -39,6 +39,7 @@ import {
   GovernanceController,
   WorkingUnitsController,
   PositionsController,
+  ScopesController,
   GovernanceStatsController,
   ApprovalPoliciesController,
   ApprovalRequestsController,
@@ -66,6 +67,7 @@ const useCases = [
     GovernanceController,
     WorkingUnitsController,
     PositionsController,
+    ScopesController,
     GovernanceStatsController,
     // Approval Engine Controllers
     ApprovalPoliciesController,
