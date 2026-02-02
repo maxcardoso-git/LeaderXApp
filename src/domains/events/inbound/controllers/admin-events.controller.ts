@@ -263,6 +263,34 @@ export class AdminEventsController {
     return this.toEventResponse(event);
   }
 
+  @Post(':eventId/clone')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Clone an event' })
+  async clone(
+    @Headers('x-tenant-id') tenantId: string,
+    @Headers('x-actor-id') actorId: string,
+    @Param('eventId') eventId: string,
+    @Body() dto: { name: string; startsAt: string; endsAt: string },
+  ): Promise<EventResponseDto> {
+    // Get original event
+    const originalEvent = await this.getEventDetails.execute({ tenantId, eventId });
+
+    // Create cloned event with new name and dates
+    const { event } = await this.createEvent.execute({
+      tenantId,
+      actorId,
+      name: dto.name,
+      startsAt: new Date(dto.startsAt),
+      endsAt: new Date(dto.endsAt),
+      description: originalEvent.description,
+      visibility: originalEvent.visibility,
+      reservationMode: originalEvent.reservationMode,
+      metadata: originalEvent.metadata,
+    });
+
+    return this.toEventResponse(event);
+  }
+
   @Post(':eventId/activate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Activate an event' })
