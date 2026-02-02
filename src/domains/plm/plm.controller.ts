@@ -1334,6 +1334,13 @@ export class CardsController {
             fromTransitions: {
               include: { toStage: { select: { id: true, name: true, color: true, wipLimit: true } } },
             },
+            avatarRules: {
+              include: {
+                avatar: {
+                  select: { id: true, code: true, name: true, emoji: true, color: true },
+                },
+              },
+            },
           },
         },
         pipeline: { select: { id: true, key: true, name: true } },
@@ -1373,6 +1380,7 @@ export class CardsController {
           id: card.currentStage.id,
           name: card.currentStage.name,
           color: card.currentStage.color,
+          avatarRules: card.currentStage.avatarRules,
         },
       },
       forms: card.forms,
