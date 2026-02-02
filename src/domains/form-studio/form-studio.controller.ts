@@ -103,11 +103,11 @@ export class FormsController {
     return { items, page: Number(page), size: Number(size), total };
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get form by ID' })
-  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
+  @Get('by-form-id/:formId')
+  @ApiOperation({ summary: 'Get form by formId' })
+  async getByFormId(@Headers('x-tenant-id') tenantId: string, @Param('formId') formId: string) {
     const form = await this.prisma.dataEntryForm.findFirst({
-      where: { id, tenantId },
+      where: { formId, tenantId },
       include: {
         _count: {
           select: { submissions: true, versions: true },
@@ -118,11 +118,11 @@ export class FormsController {
     return form;
   }
 
-  @Get('by-form-id/:formId')
-  @ApiOperation({ summary: 'Get form by formId' })
-  async getByFormId(@Headers('x-tenant-id') tenantId: string, @Param('formId') formId: string) {
+  @Get(':id')
+  @ApiOperation({ summary: 'Get form by ID' })
+  async getById(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string) {
     const form = await this.prisma.dataEntryForm.findFirst({
-      where: { formId, tenantId },
+      where: { id, tenantId },
       include: {
         _count: {
           select: { submissions: true, versions: true },
