@@ -275,7 +275,7 @@ export class AdminEventsController {
     // Get original event
     const originalEvent = await this.getEventDetails.execute({ tenantId, eventId });
 
-    // Create cloned event with new name and dates (always as DRAFT)
+    // Create cloned event with new name and dates
     const { event } = await this.createEvent.execute({
       tenantId,
       actorId,
@@ -286,8 +286,16 @@ export class AdminEventsController {
       visibility: originalEvent.visibility,
       reservationMode: originalEvent.reservationMode,
       metadata: originalEvent.metadata,
-      status: 'DRAFT', // Always create cloned events as DRAFT
     });
+
+    // Ensure cloned event is always DRAFT (in case create doesn't default to DRAFT)
+    if (event.status !== 'DRAFT') {
+      await this.prisma.event.update({
+        where: { id: event.id },
+        data: { status: 'DRAFT' },
+      });
+      event.status = 'DRAFT' as any;
+    }
 
     return this.toEventResponse(event);
   }
