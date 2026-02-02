@@ -547,29 +547,42 @@ export class ProgramsController {
       throw new HttpException({ error: 'PROGRAM_CODE_EXISTS' }, HttpStatus.CONFLICT);
     }
 
-    // Verify category exists if provided
-    if (dto.categoryId) {
-      const category = await this.prisma.category.findFirst({
-        where: { id: dto.categoryId, tenantId },
+    // Verify categories exist if provided
+    const categoryIds = dto.categoryIds || [];
+    if (categoryIds.length > 0) {
+      const categories = await this.prisma.category.findMany({
+        where: { id: { in: categoryIds }, tenantId },
       });
-      if (!category) {
+      if (categories.length !== categoryIds.length) {
         throw new HttpException({ error: 'CATEGORY_NOT_FOUND' }, HttpStatus.BAD_REQUEST);
       }
     }
 
-    return this.prisma.program.create({
+    const program = await this.prisma.program.create({
       data: {
         tenantId,
         code,
         name: dto.name,
         description: dto.description,
-        categoryId: dto.categoryId || null,
         renewalPeriodMonths: dto.renewalPeriodMonths || null,
         billingPeriod: dto.billingPeriod || null,
         isActive: dto.isActive ?? true,
         metadata: dto.metadata ?? {},
+        categories: {
+          create: categoryIds.map((categoryId: string) => ({
+            tenantId,
+            categoryId,
+          })),
+        },
+      },
+      include: {
+        categories: {
+          include: { category: true },
+        },
       },
     });
+
+    return program;
   }
 
   @Get()
@@ -592,7 +605,11 @@ export class ProgramsController {
       ];
     }
 
-    if (categoryId) where.categoryId = categoryId;
+    if (categoryId) {
+      where.categories = {
+        some: { categoryId },
+      };
+    }
     if (isActive !== undefined) where.isActive = isActive === 'true';
 
     const now = new Date();
@@ -611,6 +628,9 @@ export class ProgramsController {
           benefits: {
             include: { benefit: true },
             orderBy: { sortOrder: 'asc' },
+          },
+          categories: {
+            include: { category: true },
           },
         },
       }),
@@ -644,13 +664,28 @@ export class ProgramsController {
     const existing = await this.prisma.program.findFirst({ where: { id, tenantId } });
     if (!existing) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
 
-    // Verify category exists if provided
-    if (dto.categoryId) {
-      const category = await this.prisma.category.findFirst({
-        where: { id: dto.categoryId, tenantId },
-      });
-      if (!category) {
-        throw new HttpException({ error: 'CATEGORY_NOT_FOUND' }, HttpStatus.BAD_REQUEST);
+    // Verify categories exist if provided
+    if (dto.categoryIds !== undefined) {
+      const categoryIds = dto.categoryIds || [];
+      if (categoryIds.length > 0) {
+        const categories = await this.prisma.category.findMany({
+          where: { id: { in: categoryIds }, tenantId },
+        });
+        if (categories.length !== categoryIds.length) {
+          throw new HttpException({ error: 'CATEGORY_NOT_FOUND' }, HttpStatus.BAD_REQUEST);
+        }
+      }
+
+      // Update categories - delete all and recreate
+      await this.prisma.programCategory.deleteMany({ where: { programId: id } });
+      if (categoryIds.length > 0) {
+        await this.prisma.programCategory.createMany({
+          data: categoryIds.map((categoryId: string) => ({
+            tenantId,
+            programId: id,
+            categoryId,
+          })),
+        });
       }
     }
 
@@ -659,11 +694,15 @@ export class ProgramsController {
       data: {
         name: dto.name ?? existing.name,
         description: dto.description ?? existing.description,
-        categoryId: dto.categoryId !== undefined ? dto.categoryId || null : existing.categoryId,
         renewalPeriodMonths: dto.renewalPeriodMonths !== undefined ? dto.renewalPeriodMonths : existing.renewalPeriodMonths,
         billingPeriod: dto.billingPeriod !== undefined ? dto.billingPeriod : existing.billingPeriod,
         isActive: dto.isActive ?? existing.isActive,
         metadata: dto.metadata ?? existing.metadata,
+      },
+      include: {
+        categories: {
+          include: { category: true },
+        },
       },
     });
   }
@@ -694,6 +733,9 @@ export class ProgramsController {
           include: { benefit: true },
           orderBy: { sortOrder: 'asc' },
         },
+        categories: {
+          include: { category: true },
+        },
       },
     });
     if (!program) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
@@ -705,11 +747,12 @@ export class ProgramsController {
       return pt.isActive && startsValid && endsValid;
     });
 
-    // Check if category has classifications (for benefits eligibility)
+    // Check if any category has classifications (for benefits eligibility)
     let canHaveBenefits = false;
-    if (program.categoryId) {
+    if (program.categories && program.categories.length > 0) {
+      const categoryIds = program.categories.map(pc => pc.categoryId);
       const classificationsCount = await this.prisma.classification.count({
-        where: { tenantId, categoryId: program.categoryId },
+        where: { tenantId, categoryId: { in: categoryIds } },
       });
       canHaveBenefits = classificationsCount > 0;
     }
@@ -754,13 +797,17 @@ export class ProgramsController {
   @Put(':id/benefits')
   @ApiOperation({ summary: 'Set program benefits' })
   async setBenefits(@Headers('x-tenant-id') tenantId: string, @Param('id') id: string, @Body() dto: { benefitIds: string[] }) {
-    const program = await this.prisma.program.findFirst({ where: { id, tenantId } });
+    const program = await this.prisma.program.findFirst({
+      where: { id, tenantId },
+      include: { categories: true },
+    });
     if (!program) throw new HttpException({ error: 'PROGRAM_NOT_FOUND' }, HttpStatus.NOT_FOUND);
 
-    // Check if program's category has classifications
-    if (program.categoryId) {
+    // Check if any of program's categories has classifications
+    if (program.categories && program.categories.length > 0) {
+      const categoryIds = program.categories.map(pc => pc.categoryId);
       const classificationsCount = await this.prisma.classification.count({
-        where: { tenantId, categoryId: program.categoryId },
+        where: { tenantId, categoryId: { in: categoryIds } },
       });
       if (classificationsCount === 0 && dto.benefitIds.length > 0) {
         throw new HttpException(
