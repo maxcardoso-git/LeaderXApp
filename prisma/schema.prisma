@@ -1246,6 +1246,7 @@ model TableName {
   name            String
   icon            String?
   color           String?
+  tableType       String?  @map("table_type") // SQUARE, ROUND, RECTANGULAR, OVAL
   defaultCapacity Int?     @map("default_capacity")
   displayOrder    Int?     @map("display_order")
   createdAt       DateTime @default(now()) @map("created_at")
