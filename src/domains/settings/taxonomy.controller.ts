@@ -1411,6 +1411,7 @@ export class TableNamesController {
         color: dto.color,
         defaultCapacity: dto.defaultCapacity,
         displayOrder: dto.displayOrder,
+        tableType: dto.tableType,
       },
     });
   }
@@ -1475,6 +1476,7 @@ export class TableNamesController {
         color: dto.color !== undefined ? dto.color : existing.color,
         defaultCapacity: dto.defaultCapacity !== undefined ? dto.defaultCapacity : existing.defaultCapacity,
         displayOrder: dto.displayOrder !== undefined ? dto.displayOrder : existing.displayOrder,
+        tableType: dto.tableType !== undefined ? dto.tableType : existing.tableType,
       },
     });
   }
