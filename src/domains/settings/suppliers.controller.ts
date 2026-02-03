@@ -32,6 +32,40 @@ class PaginatedResponse<T> {
 export class SuppliersController {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Transform database model to frontend format
+  private transformSupplier(supplier: any): any {
+    const metadata = (supplier.metadata as Record<string, any>) || {};
+
+    return {
+      ...supplier,
+      supplierType: metadata.supplierType,
+      legalName: supplier.tradeName,
+      cnpj: supplier.document,
+      stateRegistration: metadata.stateRegistration,
+      municipalRegistration: metadata.municipalRegistration,
+      profileDescription: metadata.profileDescription,
+      address: {
+        zip: supplier.zipCode,
+        street: supplier.street,
+        number: supplier.number,
+        complement: supplier.complement,
+        neighborhood: supplier.neighborhood,
+        city: supplier.city,
+        state: supplier.state,
+        country: supplier.country,
+      },
+      contact: {
+        manual: {
+          name: metadata.contactName,
+          email: supplier.email,
+          phone: supplier.phone,
+        },
+      },
+      pix: metadata.pix || {},
+      bank: metadata.bank || {},
+    };
+  }
+
   @Post()
   @ApiOperation({ summary: 'Create a new supplier' })
   async create(@Headers('x-tenant-id') tenantId: string, @Body() dto: any) {
@@ -151,7 +185,12 @@ export class SuppliersController {
       this.prisma.supplier.count({ where }),
     ]);
 
-    return { items, page: Number(page), size: Number(size), total };
+    return {
+      items: items.map(item => this.transformSupplier(item)),
+      page: Number(page),
+      size: Number(size),
+      total
+    };
   }
 
   @Get(':id')
@@ -161,7 +200,7 @@ export class SuppliersController {
     if (!supplier) {
       throw new HttpException({ error: 'SUPPLIER_NOT_FOUND' }, HttpStatus.NOT_FOUND);
     }
-    return supplier;
+    return this.transformSupplier(supplier);
   }
 
   @Put(':id')
@@ -176,22 +215,21 @@ export class SuppliersController {
     const address = dto.address || {};
     const contact = dto.contact?.manual || {};
 
-    // Map frontend fields to backend fields
-    const document = dto.cnpj || dto.document;
-    const tradeName = dto.legalName || dto.tradeName;
-    const email = contact.email || dto.email;
-    const phone = contact.phone || dto.phone;
+    // Map frontend fields to backend fields - use !== undefined to allow clearing
+    const document = dto.cnpj !== undefined ? dto.cnpj : (dto.document !== undefined ? dto.document : existing.document);
+    const tradeName = dto.legalName !== undefined ? dto.legalName : (dto.tradeName !== undefined ? dto.tradeName : existing.tradeName);
+    const email = contact.email !== undefined ? contact.email : (dto.email !== undefined ? dto.email : existing.email);
+    const phone = contact.phone !== undefined ? contact.phone : (dto.phone !== undefined ? dto.phone : existing.phone);
 
     // Check for duplicate document if changed
-    const newDocument = document ?? existing.document;
-    if (newDocument && newDocument !== existing.document) {
+    if (document && document !== existing.document) {
       const existingDoc = await this.prisma.supplier.findFirst({
-        where: { tenantId, document: newDocument, id: { not: id } },
+        where: { tenantId, document, id: { not: id } },
       });
 
       if (existingDoc) {
         throw new HttpException(
-          { error: 'SUPPLIER_DOCUMENT_EXISTS', message: `Supplier with document ${newDocument} already exists` },
+          { error: 'SUPPLIER_DOCUMENT_EXISTS', message: `Supplier with document ${document} already exists` },
           HttpStatus.CONFLICT,
         );
       }
@@ -206,6 +244,8 @@ export class SuppliersController {
       ...(dto.bank !== undefined && { bank: dto.bank }),
       ...(dto.stateRegistration !== undefined && { stateRegistration: dto.stateRegistration }),
       ...(dto.municipalRegistration !== undefined && { municipalRegistration: dto.municipalRegistration }),
+      ...(dto.profileDescription !== undefined && { profileDescription: dto.profileDescription }),
+      ...(dto.supplierType !== undefined && { supplierType: dto.supplierType }),
       ...(contact.name !== undefined && { contactName: contact.name }),
     };
 
@@ -213,20 +253,20 @@ export class SuppliersController {
       where: { id },
       data: {
         name: dto.name ?? existing.name,
-        tradeName: tradeName ?? existing.tradeName,
-        document: newDocument,
+        tradeName,
+        document,
         documentType: dto.documentType ?? existing.documentType,
-        email: email ?? existing.email,
-        phone: phone ?? existing.phone,
+        email,
+        phone,
         website: dto.website ?? existing.website,
-        street: address.street || dto.street || existing.street,
-        number: address.number || dto.number || existing.number,
-        complement: address.complement || dto.complement || existing.complement,
-        neighborhood: address.neighborhood || dto.neighborhood || existing.neighborhood,
-        city: address.city || dto.city || existing.city,
-        state: address.state || dto.state || existing.state,
-        zipCode: address.zipCode || dto.zipCode || existing.zipCode,
-        country: address.country || dto.country || existing.country,
+        street: address.street !== undefined ? address.street : (dto.street !== undefined ? dto.street : existing.street),
+        number: address.number !== undefined ? address.number : (dto.number !== undefined ? dto.number : existing.number),
+        complement: address.complement !== undefined ? address.complement : (dto.complement !== undefined ? dto.complement : existing.complement),
+        neighborhood: address.neighborhood !== undefined ? address.neighborhood : (dto.neighborhood !== undefined ? dto.neighborhood : existing.neighborhood),
+        city: address.city !== undefined ? address.city : (dto.city !== undefined ? dto.city : existing.city),
+        state: address.state !== undefined ? address.state : (dto.state !== undefined ? dto.state : existing.state),
+        zipCode: address.zip !== undefined ? address.zip : (dto.zipCode !== undefined ? dto.zipCode : existing.zipCode),
+        country: address.country !== undefined ? address.country : (dto.country !== undefined ? dto.country : existing.country),
         categoryId: dto.categoryId ?? existing.categoryId,
         segmentId: dto.segmentId ?? existing.segmentId,
         status: dto.status ?? existing.status,
