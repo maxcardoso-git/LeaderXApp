@@ -176,3 +176,98 @@ export class PaginatedResponseDto<T> {
   @ApiProperty()
   total: number;
 }
+
+// ============================================
+// AUDIT LOG DTOs
+// ============================================
+
+export class SearchAuditLogsDto {
+  @ApiPropertyOptional({ description: 'Filter by resource type' })
+  @IsOptional()
+  @IsString()
+  resourceType?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by resource ID' })
+  @IsOptional()
+  @IsString()
+  resourceId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by actor ID' })
+  @IsOptional()
+  @IsString()
+  actorId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by action' })
+  @IsOptional()
+  @IsString()
+  action?: string;
+
+  @ApiPropertyOptional({ description: 'Start date (ISO 8601)' })
+  @IsOptional()
+  @IsString()
+  from?: string;
+
+  @ApiPropertyOptional({ description: 'End date (ISO 8601)' })
+  @IsOptional()
+  @IsString()
+  to?: string;
+
+  @ApiPropertyOptional({ description: 'Free text search' })
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @ApiPropertyOptional({ description: 'Page number', default: 1 })
+  @IsOptional()
+  page?: number;
+
+  @ApiPropertyOptional({ description: 'Page size', default: 25 })
+  @IsOptional()
+  size?: number;
+}
+
+export class AuditLogResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  action: string;
+
+  @ApiProperty()
+  resourceType: string;
+
+  @ApiProperty()
+  resourceId: string;
+
+  @ApiProperty()
+  actorId: string;
+
+  @ApiProperty()
+  tenantId: string;
+
+  @ApiProperty()
+  orgId: string;
+
+  @ApiPropertyOptional()
+  correlationId?: string;
+
+  @ApiPropertyOptional()
+  metadata?: Record<string, unknown>;
+
+  @ApiProperty()
+  timestamp: string;
+
+  @ApiProperty()
+  createdAt: string;
+
+  @ApiPropertyOptional()
+  actorName?: string;
+
+  @ApiPropertyOptional()
+  actorEmail?: string;
+}
+
+export class PagedAuditLogsResponseDto extends PaginatedResponseDto<AuditLogResponseDto> {
+  @ApiProperty({ type: [AuditLogResponseDto] })
+  items: AuditLogResponseDto[];
+}

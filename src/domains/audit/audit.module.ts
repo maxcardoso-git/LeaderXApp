@@ -11,6 +11,8 @@ import {
   GenerateComplianceReportUseCase,
   GetLatestComplianceReportUseCase,
   GetComplianceReportByIdUseCase,
+  SearchAuditLogsUseCase,
+  GetAuditLogByIdUseCase,
 } from './application/usecases';
 
 // Domain Services
@@ -36,6 +38,7 @@ import {
   IdentityReadAdapter,
   EventsReadAdapter,
   PointsReadAdapter,
+  AuditLogRepository,
 } from './outbound/repositories';
 
 @Module({
@@ -48,6 +51,8 @@ import {
     GenerateComplianceReportUseCase,
     GetLatestComplianceReportUseCase,
     GetComplianceReportByIdUseCase,
+    SearchAuditLogsUseCase,
+    GetAuditLogByIdUseCase,
 
     // Domain Services
     ComplianceEvaluatorService,
@@ -66,6 +71,7 @@ import {
       provide: COMPLIANCE_REPORT_REPOSITORY,
       useClass: ComplianceReportRepository,
     },
+    AuditLogRepository,
 
     // Cross-Domain Read Adapters
     {

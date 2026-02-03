@@ -19,6 +19,9 @@ import {
   ComplianceReportResponseDto,
   ComplianceResultResponseDto,
   EvidenceItemDto,
+  SearchAuditLogsDto,
+  AuditLogResponseDto,
+  PagedAuditLogsResponseDto,
 } from '../dtos';
 import {
   ListComplianceChecksUseCase,
@@ -26,6 +29,8 @@ import {
   GenerateComplianceReportUseCase,
   GetLatestComplianceReportUseCase,
   GetComplianceReportByIdUseCase,
+  SearchAuditLogsUseCase,
+  GetAuditLogByIdUseCase,
 } from '../../application/usecases';
 import { ComplianceCheckAggregate, ComplianceReportAggregate } from '../../domain/aggregates';
 import { ComplianceCheckResultEntity } from '../../domain/entities';
@@ -33,7 +38,7 @@ import { ComplianceExecutionResult } from '../../domain/services';
 import { ComplianceRules, EvidenceItem } from '../../domain/value-objects';
 
 @ApiTags('Audit & Compliance')
-@Controller('audit/compliance')
+@Controller('audit')
 @ApiHeader({ name: 'X-Tenant-Id', required: true })
 @ApiHeader({ name: 'X-Actor-Id', required: false })
 export class AuditController {
@@ -43,6 +48,8 @@ export class AuditController {
     private readonly generateReport: GenerateComplianceReportUseCase,
     private readonly getLatestReport: GetLatestComplianceReportUseCase,
     private readonly getReportById: GetComplianceReportByIdUseCase,
+    private readonly searchLogs: SearchAuditLogsUseCase,
+    private readonly getLogById: GetAuditLogByIdUseCase,
   ) {}
 
   private toCheckResponse(check: ComplianceCheckAggregate): ComplianceCheckResponseDto {
@@ -169,5 +176,61 @@ export class AuditController {
   async getById(@Param('reportId') reportId: string): Promise<ComplianceReportResponseDto> {
     const report = await this.getReportById.execute(reportId);
     return this.toReportResponse(report);
+  }
+
+  // ============================================
+  // AUDIT LOGS ENDPOINTS
+  // ============================================
+
+  @Get('logs')
+  @ApiOperation({ summary: 'Search audit logs' })
+  async searchAuditLogs(
+    @Headers('x-tenant-id') tenantId: string,
+    @Query() query: SearchAuditLogsDto,
+  ): Promise<PagedAuditLogsResponseDto> {
+    const result = await this.searchLogs.execute({
+      tenantId,
+      resourceType: query.resourceType,
+      resourceId: query.resourceId,
+      actorId: query.actorId,
+      action: query.action,
+      from: query.from,
+      to: query.to,
+      q: query.q,
+      page: query.page,
+      size: query.size,
+    });
+
+    return {
+      items: result.items.map((log: any) => this.toAuditLogResponse(log)),
+      total: result.total,
+      page: result.page,
+      size: result.size,
+    };
+  }
+
+  @Get('logs/:id')
+  @ApiOperation({ summary: 'Get audit log by ID' })
+  async getAuditLogById(@Param('id') id: string): Promise<AuditLogResponseDto> {
+    const log = await this.getLogById.execute(id);
+    return this.toAuditLogResponse(log);
+  }
+
+  private toAuditLogResponse(log: any): AuditLogResponseDto {
+    return {
+      id: log.id,
+      action: log.action,
+      resourceType: log.resourceType,
+      resourceId: log.resourceId,
+      actorId: log.actorId,
+      tenantId: log.tenantId,
+      orgId: log.orgId,
+      correlationId: log.correlationId,
+      metadata: log.metadata,
+      timestamp: log.timestamp.toISOString(),
+      createdAt: log.createdAt.toISOString(),
+      actorName: log.actorName,
+      actorEmail: log.actorEmail,
+    };
   }
 }

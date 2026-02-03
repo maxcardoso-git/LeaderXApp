@@ -12,10 +12,7 @@ import {
 } from '../../domain/ports';
 import { ComplianceEvaluatorService, ComplianceExecutionResult } from '../../domain/services';
 import { ComplianceEvaluationContext } from '../../domain/value-objects';
-import {
-  ComplianceCheckNotFoundError,
-  ComplianceReportNotFoundError,
-} from '../errors';
+import { AuditLogRepository } from '../../outbound/repositories';
 
 // ============================================
 // LIST COMPLIANCE CHECKS
@@ -183,5 +180,54 @@ export class GetComplianceReportByIdUseCase {
     }
 
     return report;
+  }
+}
+
+// ============================================
+// SEARCH AUDIT LOGS
+// ============================================
+
+export interface SearchAuditLogsInput {
+  tenantId: string;
+  resourceType?: string;
+  resourceId?: string;
+  actorId?: string;
+  action?: string;
+  from?: string;
+  to?: string;
+  q?: string;
+  page?: number;
+  size?: number;
+}
+
+@Injectable()
+export class SearchAuditLogsUseCase {
+  constructor(
+    private readonly auditLogRepository: AuditLogRepository,
+  ) {}
+
+  async execute(input: SearchAuditLogsInput): Promise<any> {
+    return this.auditLogRepository.search(input);
+  }
+}
+
+// ============================================
+// GET AUDIT LOG BY ID
+// ============================================
+
+@Injectable()
+export class GetAuditLogByIdUseCase {
+  constructor(
+    private readonly auditLogRepository: AuditLogRepository,
+  ) {}
+
+  async execute(id: string): Promise<any> {
+    const log = await this.auditLogRepository.findById(id);
+
+    if (!log) {
+      throw new NotFoundException(`Audit log not found: ${id}`);
+    }
+
+    return log;
   }
 }

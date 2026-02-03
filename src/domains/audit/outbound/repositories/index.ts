@@ -5,3 +5,4 @@ export * from './governance-read.adapter';
 export * from './identity-read.adapter';
 export * from './events-read.adapter';
 export * from './points-read.adapter';
+export * from './audit-log.repository';
