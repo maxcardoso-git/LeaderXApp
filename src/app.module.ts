@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { CqrsModule } from '@nestjs/cqrs';
+import { ScheduleModule } from '@nestjs/schedule';
 
 // Infrastructure
 import { PrismaService } from '@infrastructure/persistence/prisma.service';
@@ -46,12 +47,17 @@ import { PlmModule } from './domains/plm';
 // System Domain
 import { SystemModule } from './domains/system';
 
+// Outbox Module (for background event processing)
+import { OutboxModule } from './common/outbox/outbox.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     CqrsModule,
+    OutboxModule,
     PointsModule,
     ReservationsModule,
     IdentityModule,
