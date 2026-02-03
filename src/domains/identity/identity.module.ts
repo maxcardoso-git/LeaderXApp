@@ -62,6 +62,7 @@ import {
 import { IdempotencyRepository } from '../points/outbound/repositories/idempotency.repository';
 import { OutboxRepository } from '../points/outbound/repositories/outbox.repository';
 import { AuditModule } from '../audit/audit.module';
+import { EventingModule } from '../../common/eventing/eventing.module';
 import { InMemoryEventBus } from '../../common/eventing/in-memory-event-bus';
 
 const repositoryProviders = [
@@ -125,7 +126,7 @@ const eventHandlers = [
 ];
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, EventingModule],
   controllers: [IdentityController, SessionsController],
   providers: [
     PrismaService,
