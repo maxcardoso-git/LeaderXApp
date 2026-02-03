@@ -40,6 +40,10 @@ export class AuditLogRepository {
       size = 25,
     } = filters;
 
+    // Convert to numbers if they come as strings from query params
+    const pageNum = Number(page);
+    const sizeNum = Number(size);
+
     const where: Prisma.AuditLogWhereInput = {
       tenantId,
       ...(resourceType && { resourceType }),
@@ -61,8 +65,8 @@ export class AuditLogRepository {
       this.prisma.auditLog.findMany({
         where,
         orderBy: { timestamp: 'desc' },
-        skip: (page - 1) * size,
-        take: size,
+        skip: (pageNum - 1) * sizeNum,
+        take: sizeNum,
       }),
       this.prisma.auditLog.count({ where }),
     ]);
@@ -70,8 +74,8 @@ export class AuditLogRepository {
     return {
       items,
       total,
-      page,
-      size,
+      page: pageNum,
+      size: sizeNum,
     };
   }
 
