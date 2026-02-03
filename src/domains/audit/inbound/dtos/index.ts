@@ -271,3 +271,40 @@ export class PagedAuditLogsResponseDto extends PaginatedResponseDto<AuditLogResp
   @ApiProperty({ type: [AuditLogResponseDto] })
   items: AuditLogResponseDto[];
 }
+
+export class CreateAuditLogDto {
+  @ApiProperty({ description: 'Action performed' })
+  @IsString()
+  action: string;
+
+  @ApiProperty({ description: 'Resource type' })
+  @IsString()
+  resourceType: string;
+
+  @ApiProperty({ description: 'Resource ID' })
+  @IsString()
+  resourceId: string;
+
+  @ApiProperty({ description: 'Actor ID' })
+  @IsString()
+  actorId: string;
+
+  @ApiPropertyOptional({ description: 'Correlation ID' })
+  @IsOptional()
+  @IsString()
+  correlationId?: string;
+
+  @ApiPropertyOptional({ description: 'Additional metadata' })
+  @IsOptional()
+  metadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Timestamp (ISO 8601)' })
+  @IsOptional()
+  @IsString()
+  timestamp?: string;
+}
+
+export class CreateAuditLogResponseDto {
+  @ApiProperty()
+  auditLogId: string;
+}

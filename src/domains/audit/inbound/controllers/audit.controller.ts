@@ -22,6 +22,8 @@ import {
   SearchAuditLogsDto,
   AuditLogResponseDto,
   PagedAuditLogsResponseDto,
+  CreateAuditLogDto,
+  CreateAuditLogResponseDto,
 } from '../dtos';
 import {
   ListComplianceChecksUseCase,
@@ -31,6 +33,7 @@ import {
   GetComplianceReportByIdUseCase,
   SearchAuditLogsUseCase,
   GetAuditLogByIdUseCase,
+  CreateAuditLogUseCase,
 } from '../../application/usecases';
 import { ComplianceCheckAggregate, ComplianceReportAggregate } from '../../domain/aggregates';
 import { ComplianceCheckResultEntity } from '../../domain/entities';
@@ -50,6 +53,7 @@ export class AuditController {
     private readonly getReportById: GetComplianceReportByIdUseCase,
     private readonly searchLogs: SearchAuditLogsUseCase,
     private readonly getLogById: GetAuditLogByIdUseCase,
+    private readonly createLog: CreateAuditLogUseCase,
   ) {}
 
   private toCheckResponse(check: ComplianceCheckAggregate): ComplianceCheckResponseDto {
@@ -181,6 +185,29 @@ export class AuditController {
   // ============================================
   // AUDIT LOGS ENDPOINTS
   // ============================================
+
+  @Post('logs')
+  @ApiOperation({ summary: 'Create audit log entry' })
+  @HttpCode(HttpStatus.CREATED)
+  async createAuditLog(
+    @Headers('x-tenant-id') tenantId: string,
+    @Headers('x-org-id') orgId: string,
+    @Body() dto: CreateAuditLogDto,
+  ): Promise<CreateAuditLogResponseDto> {
+    const result = await this.createLog.execute({
+      tenantId,
+      orgId,
+      action: dto.action,
+      resourceType: dto.resourceType,
+      resourceId: dto.resourceId,
+      actorId: dto.actorId,
+      correlationId: dto.correlationId,
+      metadata: dto.metadata,
+      timestamp: dto.timestamp,
+    });
+
+    return { auditLogId: result.id };
+  }
 
   @Get('logs')
   @ApiOperation({ summary: 'Search audit logs' })

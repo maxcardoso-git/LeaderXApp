@@ -231,3 +231,42 @@ export class GetAuditLogByIdUseCase {
     return log;
   }
 }
+
+// ============================================
+// CREATE AUDIT LOG
+// ============================================
+
+export interface CreateAuditLogInput {
+  tenantId: string;
+  orgId: string;
+  action: string;
+  resourceType: string;
+  resourceId: string;
+  actorId: string;
+  correlationId?: string;
+  metadata?: Record<string, unknown>;
+  timestamp?: string;
+}
+
+@Injectable()
+export class CreateAuditLogUseCase {
+  constructor(
+    private readonly auditLogRepository: AuditLogRepository,
+  ) {}
+
+  async execute(input: CreateAuditLogInput): Promise<{ id: string }> {
+    const auditLog = await this.auditLogRepository.create({
+      tenantId: input.tenantId,
+      orgId: input.orgId,
+      action: input.action,
+      resourceType: input.resourceType,
+      resourceId: input.resourceId,
+      actorId: input.actorId,
+      correlationId: input.correlationId,
+      metadata: input.metadata,
+      timestamp: input.timestamp ? new Date(input.timestamp) : new Date(),
+    });
+
+    return { id: auditLog.id };
+  }
+}

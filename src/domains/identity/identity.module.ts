@@ -46,9 +46,22 @@ import {
 import { IdentityController } from './inbound/controllers/identity.controller';
 import { SessionsController } from './inbound/controllers/sessions.controller';
 
-// Cross-domain dependencies (from Points domain)
+// Event Handlers
+import {
+  AuditOnUserCreatedHandler,
+  AuditOnUserUpdatedHandler,
+  AuditOnUserDeactivatedHandler,
+  AuditOnUserDeletedHandler,
+  AuditOnRoleCreatedHandler,
+  AuditOnRolePermissionsUpsertedHandler,
+  AuditOnRoleAssignedHandler,
+  AuditOnRoleRevokedHandler,
+} from './application/handlers';
+
+// Cross-domain dependencies
 import { IdempotencyRepository } from '../points/outbound/repositories/idempotency.repository';
 import { OutboxRepository } from '../points/outbound/repositories/outbox.repository';
+import { AuditModule } from '../audit/audit.module';
 
 const repositoryProviders = [
   {
@@ -99,7 +112,19 @@ const useCases = [
   ValidatePermissionUseCase,
 ];
 
+const eventHandlers = [
+  AuditOnUserCreatedHandler,
+  AuditOnUserUpdatedHandler,
+  AuditOnUserDeactivatedHandler,
+  AuditOnUserDeletedHandler,
+  AuditOnRoleCreatedHandler,
+  AuditOnRolePermissionsUpsertedHandler,
+  AuditOnRoleAssignedHandler,
+  AuditOnRoleRevokedHandler,
+];
+
 @Module({
+  imports: [AuditModule],
   controllers: [IdentityController, SessionsController],
   providers: [
     PrismaService,
@@ -107,6 +132,7 @@ const useCases = [
     OutboxRepository,
     ...repositoryProviders,
     ...useCases,
+    ...eventHandlers,
   ],
   exports: [...repositoryProviders, ...useCases],
 })

@@ -13,6 +13,7 @@ import {
   GetComplianceReportByIdUseCase,
   SearchAuditLogsUseCase,
   GetAuditLogByIdUseCase,
+  CreateAuditLogUseCase,
 } from './application/usecases';
 
 // Domain Services
@@ -53,6 +54,7 @@ import {
     GetComplianceReportByIdUseCase,
     SearchAuditLogsUseCase,
     GetAuditLogByIdUseCase,
+    CreateAuditLogUseCase,
 
     // Domain Services
     ComplianceEvaluatorService,

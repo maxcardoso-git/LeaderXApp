@@ -80,4 +80,30 @@ export class AuditLogRepository {
       where: { id },
     });
   }
+
+  async create(data: {
+    tenantId: string;
+    orgId: string;
+    action: string;
+    resourceType: string;
+    resourceId: string;
+    actorId: string;
+    correlationId?: string;
+    metadata?: Record<string, unknown>;
+    timestamp: Date;
+  }): Promise<any> {
+    return this.prisma.auditLog.create({
+      data: {
+        tenantId: data.tenantId,
+        orgId: data.orgId,
+        action: data.action,
+        resourceType: data.resourceType,
+        resourceId: data.resourceId,
+        actorId: data.actorId,
+        correlationId: data.correlationId,
+        metadata: data.metadata as Prisma.InputJsonValue,
+        timestamp: data.timestamp,
+      },
+    });
+  }
 }
