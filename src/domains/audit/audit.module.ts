@@ -97,6 +97,7 @@ import {
     ComplianceEvaluatorService,
     COMPLIANCE_CHECK_REPOSITORY,
     COMPLIANCE_REPORT_REPOSITORY,
+    CreateAuditLogUseCase,
   ],
 })
 export class AuditModule {}
