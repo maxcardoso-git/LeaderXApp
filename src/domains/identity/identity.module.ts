@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '@infrastructure/persistence/prisma.service';
 
 // Domain ports
@@ -62,6 +62,7 @@ import {
 import { IdempotencyRepository } from '../points/outbound/repositories/idempotency.repository';
 import { OutboxRepository } from '../points/outbound/repositories/outbox.repository';
 import { AuditModule } from '../audit/audit.module';
+import { InMemoryEventBus } from '../../common/eventing/in-memory-event-bus';
 
 const repositoryProviders = [
   {
@@ -136,4 +137,28 @@ const eventHandlers = [
   ],
   exports: [...repositoryProviders, ...useCases],
 })
-export class IdentityModule {}
+export class IdentityModule implements OnModuleInit {
+  constructor(
+    private readonly eventBus: InMemoryEventBus,
+    private readonly auditOnUserCreated: AuditOnUserCreatedHandler,
+    private readonly auditOnUserUpdated: AuditOnUserUpdatedHandler,
+    private readonly auditOnUserDeactivated: AuditOnUserDeactivatedHandler,
+    private readonly auditOnUserDeleted: AuditOnUserDeletedHandler,
+    private readonly auditOnRoleCreated: AuditOnRoleCreatedHandler,
+    private readonly auditOnRolePermissionsUpserted: AuditOnRolePermissionsUpsertedHandler,
+    private readonly auditOnRoleAssigned: AuditOnRoleAssignedHandler,
+    private readonly auditOnRoleRevoked: AuditOnRoleRevokedHandler,
+  ) {}
+
+  onModuleInit() {
+    // Register event handlers
+    this.eventBus.registerHandler(this.auditOnUserCreated);
+    this.eventBus.registerHandler(this.auditOnUserUpdated);
+    this.eventBus.registerHandler(this.auditOnUserDeactivated);
+    this.eventBus.registerHandler(this.auditOnUserDeleted);
+    this.eventBus.registerHandler(this.auditOnRoleCreated);
+    this.eventBus.registerHandler(this.auditOnRolePermissionsUpserted);
+    this.eventBus.registerHandler(this.auditOnRoleAssigned);
+    this.eventBus.registerHandler(this.auditOnRoleRevoked);
+  }
+}
