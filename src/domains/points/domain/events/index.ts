@@ -216,3 +216,103 @@ export class PointsCommittedEvent implements PointsDomainEvent {
     };
   }
 }
+
+/**
+ * Event emitted when a points ledger entry is posted (journey-aware)
+ */
+export class PointsEntryPostedEvent implements PointsDomainEvent {
+  readonly domain = 'points' as const;
+  readonly type = 'PointsEntryPosted';
+  readonly occurredAt = new Date();
+
+  constructor(
+    readonly eventId: string,
+    readonly tenantId: string,
+    readonly entryId: string,
+    readonly accountId: string,
+    readonly memberId: string,
+    readonly entryType: string,
+    readonly amount: number,
+    readonly reasonCode: string,
+    readonly referenceType: string,
+    readonly referenceId: string,
+    readonly journeyCode: string,
+    readonly journeyTrigger: string,
+    readonly idempotencyKey: string,
+    readonly approvalPolicyCode?: string,
+    readonly approvalRequestId?: string,
+    readonly sourceEventId?: string,
+    readonly requestId?: string,
+    readonly actorId?: string,
+  ) {}
+
+  toPayload(): Record<string, unknown> {
+    return {
+      eventId: this.eventId,
+      occurredAt: this.occurredAt.toISOString(),
+      tenantId: this.tenantId,
+      requestId: this.requestId,
+      actorId: this.actorId,
+      domain: this.domain,
+      type: this.type,
+      data: {
+        entryId: this.entryId,
+        accountId: this.accountId,
+        memberId: this.memberId,
+        entryType: this.entryType,
+        amount: this.amount,
+        reasonCode: this.reasonCode,
+        referenceType: this.referenceType,
+        referenceId: this.referenceId,
+        journeyCode: this.journeyCode,
+        journeyTrigger: this.journeyTrigger,
+        idempotencyKey: this.idempotencyKey,
+        approvalPolicyCode: this.approvalPolicyCode,
+        approvalRequestId: this.approvalRequestId,
+        sourceEventId: this.sourceEventId,
+      },
+    };
+  }
+}
+
+/**
+ * Event emitted when a points ledger entry is reversed
+ */
+export class PointsEntryReversedEvent implements PointsDomainEvent {
+  readonly domain = 'points' as const;
+  readonly type = 'PointsEntryReversed';
+  readonly occurredAt = new Date();
+
+  constructor(
+    readonly eventId: string,
+    readonly tenantId: string,
+    readonly originalEntryId: string,
+    readonly reversalEntryId: string,
+    readonly accountId: string,
+    readonly memberId: string,
+    readonly amount: number,
+    readonly reasonCode: string,
+    readonly requestId?: string,
+    readonly actorId?: string,
+  ) {}
+
+  toPayload(): Record<string, unknown> {
+    return {
+      eventId: this.eventId,
+      occurredAt: this.occurredAt.toISOString(),
+      tenantId: this.tenantId,
+      requestId: this.requestId,
+      actorId: this.actorId,
+      domain: this.domain,
+      type: this.type,
+      data: {
+        originalEntryId: this.originalEntryId,
+        reversalEntryId: this.reversalEntryId,
+        accountId: this.accountId,
+        memberId: this.memberId,
+        amount: this.amount,
+        reasonCode: this.reasonCode,
+      },
+    };
+  }
+}

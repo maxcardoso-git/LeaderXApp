@@ -103,3 +103,41 @@ export class CommitHoldCommand implements BasePointsCommand {
     public readonly idempotencyKey?: string,
   ) {}
 }
+
+/**
+ * Post a journey-aware points ledger entry
+ */
+export class PostPointsEntryCommand implements BasePointsCommand {
+  constructor(
+    public readonly tenantId: string,
+    public readonly memberId: string,
+    public readonly entryType: 'CREDIT' | 'DEBIT',
+    public readonly amount: number,
+    public readonly reasonCode: string,
+    public readonly referenceType: string,
+    public readonly referenceId: string,
+    public readonly journeyCode: string,
+    public readonly journeyTrigger: string,
+    public readonly idempotencyKey: string,
+    public readonly approvalPolicyCode?: string,
+    public readonly approvalRequestId?: string,
+    public readonly sourceEventId?: string,
+    public readonly metadata?: Record<string, unknown>,
+    public readonly requestId?: string,
+    public readonly actorId?: string,
+  ) {}
+}
+
+/**
+ * Reverse a posted ledger entry
+ */
+export class ReversePointsEntryCommand implements BasePointsCommand {
+  constructor(
+    public readonly tenantId: string,
+    public readonly entryId: string,
+    public readonly reasonCode: string,
+    public readonly idempotencyKey: string,
+    public readonly requestId?: string,
+    public readonly actorId?: string,
+  ) {}
+}

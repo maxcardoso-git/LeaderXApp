@@ -167,12 +167,25 @@ model PointLedgerEntry {
   metadata       Json?
   createdAt      DateTime @default(now()) @map("created_at")
 
+  // Journey reference fields
+  status             String   @default("POSTED") @map("status") // POSTED | REVERSED
+  journeyCode        String?  @map("journey_code")
+  journeyTrigger     String?  @map("journey_trigger")
+  approvalPolicyCode String?  @map("approval_policy_code")
+  approvalRequestId  String?  @map("approval_request_id")
+  sourceEventId      String?  @map("source_event_id")
+  reversedById       String?  @map("reversed_by_id")
+  reversalOfId       String?  @map("reversal_of_id")
+
   // Relations
   account PointAccount @relation(fields: [accountId], references: [id])
 
   @@index([tenantId, accountId, createdAt])
   @@index([tenantId, referenceType, referenceId])
   @@index([idempotencyKey])
+  @@index([tenantId, journeyCode])
+  @@index([tenantId, sourceEventId])
+  @@index([tenantId, approvalRequestId])
   @@map("point_ledger_entries")
 }
 

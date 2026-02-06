@@ -34,10 +34,15 @@ import {
   CommitHoldHandler,
   GetBalanceHandler,
   GetStatementHandler,
+  PostPointsEntryHandler,
+  ReversePointsEntryHandler,
+  ListLedgerEntriesHandler,
+  GetLedgerEntryHandler,
+  GetMemberBalanceHandler,
 } from './application/handlers';
 
 // Inbound adapters (controllers)
-import { PointsController } from './inbound/controllers';
+import { PointsController, PointsLedgerController } from './inbound/controllers';
 
 const repositoryProviders = [
   {
@@ -82,10 +87,15 @@ const handlers = [
   CommitHoldHandler,
   GetBalanceHandler,
   GetStatementHandler,
+  PostPointsEntryHandler,
+  ReversePointsEntryHandler,
+  ListLedgerEntriesHandler,
+  GetLedgerEntryHandler,
+  GetMemberBalanceHandler,
 ];
 
 @Module({
-  controllers: [PointsController],
+  controllers: [PointsController, PointsLedgerController],
   providers: [
     PrismaService,
     ...repositoryProviders,

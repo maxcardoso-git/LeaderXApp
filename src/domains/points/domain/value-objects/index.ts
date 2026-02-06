@@ -180,3 +180,64 @@ export class AccountOwner {
     return this._type === other._type && this._id === other._id;
   }
 }
+
+// ============================================
+// Ledger Entry Status
+// ============================================
+
+export enum LedgerEntryStatus {
+  POSTED = 'POSTED',
+  REVERSED = 'REVERSED',
+}
+
+// ============================================
+// Journey Reference
+// ============================================
+
+export class JourneyReference {
+  private constructor(
+    private readonly _journeyCode: string,
+    private readonly _journeyTrigger: string,
+    private readonly _approvalPolicyCode?: string,
+    private readonly _approvalRequestId?: string,
+    private readonly _sourceEventId?: string,
+  ) {}
+
+  static create(
+    journeyCode: string,
+    journeyTrigger: string,
+    approvalPolicyCode?: string,
+    approvalRequestId?: string,
+    sourceEventId?: string,
+  ): JourneyReference {
+    if (!journeyCode) {
+      throw new Error('Journey code is required');
+    }
+    if (!journeyTrigger) {
+      throw new Error('Journey trigger is required');
+    }
+    return new JourneyReference(
+      journeyCode,
+      journeyTrigger,
+      approvalPolicyCode,
+      approvalRequestId,
+      sourceEventId,
+    );
+  }
+
+  get journeyCode(): string {
+    return this._journeyCode;
+  }
+  get journeyTrigger(): string {
+    return this._journeyTrigger;
+  }
+  get approvalPolicyCode(): string | undefined {
+    return this._approvalPolicyCode;
+  }
+  get approvalRequestId(): string | undefined {
+    return this._approvalRequestId;
+  }
+  get sourceEventId(): string | undefined {
+    return this._sourceEventId;
+  }
+}

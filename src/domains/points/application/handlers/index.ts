@@ -5,3 +5,8 @@ export * from './release-hold.handler';
 export * from './commit-hold.handler';
 export * from './get-balance.handler';
 export * from './get-statement.handler';
+export * from './post-points-entry.handler';
+export * from './reverse-points-entry.handler';
+export * from './list-ledger-entries.handler';
+export * from './get-ledger-entry.handler';
+export * from './get-member-balance.handler';

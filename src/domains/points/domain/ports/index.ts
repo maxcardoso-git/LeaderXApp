@@ -87,11 +87,34 @@ export interface BalanceAggregates {
   reversals: number;
 }
 
+export interface ListLedgerEntriesByMemberFilter {
+  tenantId: string;
+  memberId?: string;
+  entryType?: LedgerEntryType;
+  dateFrom?: Date;
+  dateTo?: Date;
+  status?: string;
+  journeyCode?: string;
+}
+
 export interface PointLedgerRepositoryPort {
   appendEntry(entry: PointLedgerEntry, ctx?: TransactionContext): Promise<void>;
 
+  findById(
+    tenantId: string,
+    entryId: string,
+    ctx?: TransactionContext,
+  ): Promise<PointLedgerEntry | null>;
+
+  updateStatus(entry: PointLedgerEntry, ctx?: TransactionContext): Promise<void>;
+
   listEntries(
     filter: ListLedgerEntriesFilter,
+    pagination: LedgerPaginationOptions,
+  ): Promise<PaginatedLedgerResult>;
+
+  listEntriesByMember(
+    filter: ListLedgerEntriesByMemberFilter,
     pagination: LedgerPaginationOptions,
   ): Promise<PaginatedLedgerResult>;
 
