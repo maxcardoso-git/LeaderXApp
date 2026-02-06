@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -23,12 +24,16 @@ import {
   GetJourneyInstanceUseCase,
   ListApprovalRequestsUseCase,
   ListTransitionLogsUseCase,
+  ExecuteTriggerUseCase,
+  ExecuteCommandUseCase,
 } from '../../application/usecases';
 import {
   JourneyTransitionOrigin,
   ApprovalStatus,
   APPROVAL_REQUEST_REPOSITORY,
   ApprovalRequestRepository,
+  JOURNEY_DEFINITION_REPOSITORY,
+  JourneyDefinitionRepository,
 } from '../../domain';
 
 // ============================================
@@ -78,6 +83,43 @@ class ResolveApprovalDto {
   targetState?: string;
 }
 
+class ExecuteTriggerDto {
+  trigger: string;
+  actorId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+class ExecuteCommandDto {
+  command: string;
+  memberId: string;
+  journeyCode?: string;
+  actorId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+class CreateJourneyDefinitionDto {
+  code: string;
+  version: string;
+  name: string;
+  description?: string;
+  initialState: string;
+  states: string[];
+  transitions: any[];
+  commands?: any[];
+  events?: string[];
+}
+
+class UpdateJourneyDefinitionDto {
+  name?: string;
+  description?: string;
+  initialState?: string;
+  states?: string[];
+  transitions?: any[];
+  commands?: any[];
+  events?: string[];
+  isActive?: boolean;
+}
+
 // ============================================
 // Controller
 // ============================================
@@ -91,6 +133,8 @@ export class MemberJourneyController {
   constructor(
     @Inject(APPROVAL_REQUEST_REPOSITORY)
     private readonly approvalRepository: ApprovalRequestRepository,
+    @Inject(JOURNEY_DEFINITION_REPOSITORY)
+    private readonly definitionRepository: JourneyDefinitionRepository,
     private readonly createJourneyInstance: CreateJourneyInstanceUseCase,
     private readonly transitionState: TransitionStateUseCase,
     private readonly createApprovalRequest: CreateApprovalRequestUseCase,
@@ -99,6 +143,8 @@ export class MemberJourneyController {
     private readonly getJourneyInstance: GetJourneyInstanceUseCase,
     private readonly listApprovalRequests: ListApprovalRequestsUseCase,
     private readonly listTransitionLogs: ListTransitionLogsUseCase,
+    private readonly executeTrigger: ExecuteTriggerUseCase,
+    private readonly executeCommand: ExecuteCommandUseCase,
   ) {}
 
   // ============================================
@@ -420,5 +466,160 @@ export class MemberJourneyController {
     }
 
     return { processed: false, reason: 'UNKNOWN_OUTCOME' };
+  }
+
+  // ============================================
+  // Smart Trigger & Command Engine
+  // ============================================
+
+  @Post('instances/:id/trigger')
+  @ApiOperation({ summary: 'Fire a trigger on a journey instance (validates against definition)' })
+  async fireTrigger(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: ExecuteTriggerDto,
+  ) {
+    try {
+      return await this.executeTrigger.execute({
+        tenantId,
+        journeyInstanceId: id,
+        trigger: dto.trigger,
+        actorId: dto.actorId,
+        metadata: dto.metadata,
+      });
+    } catch (error) {
+      throw new HttpException(
+        { error: 'TRIGGER_EXECUTION_FAILED', message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Post('commands')
+  @ApiOperation({ summary: 'Execute a high-level command (CREATE_MEMBER, REQUEST_MEMBERSHIP, etc.)' })
+  async executeJourneyCommand(
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() dto: ExecuteCommandDto,
+  ) {
+    try {
+      return await this.executeCommand.execute({
+        tenantId,
+        memberId: dto.memberId,
+        command: dto.command,
+        journeyCode: dto.journeyCode,
+        actorId: dto.actorId,
+        metadata: dto.metadata,
+      });
+    } catch (error) {
+      throw new HttpException(
+        { error: 'COMMAND_EXECUTION_FAILED', message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  // ============================================
+  // Journey Definitions (Blueprints)
+  // ============================================
+
+  @Post('definitions')
+  @ApiOperation({ summary: 'Create a journey definition' })
+  async createDefinition(
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() dto: CreateJourneyDefinitionDto,
+  ) {
+    try {
+      return await this.definitionRepository.create({
+        tenantId,
+        code: dto.code,
+        version: dto.version,
+        name: dto.name,
+        description: dto.description,
+        initialState: dto.initialState,
+        states: dto.states,
+        transitions: dto.transitions,
+        commands: dto.commands,
+        events: dto.events,
+      });
+    } catch (error) {
+      throw new HttpException(
+        { error: 'DEFINITION_CREATION_FAILED', message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Get('definitions')
+  @ApiOperation({ summary: 'List journey definitions' })
+  async listDefinitions(
+    @Headers('x-tenant-id') tenantId: string,
+  ) {
+    return this.definitionRepository.list(tenantId);
+  }
+
+  @Get('definitions/:id')
+  @ApiOperation({ summary: 'Get journey definition by ID' })
+  async getDefinition(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+  ) {
+    const definition = await this.definitionRepository.findById(tenantId, id);
+    if (!definition) {
+      throw new HttpException(
+        { error: 'DEFINITION_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return definition;
+  }
+
+  @Get('definitions/code/:code')
+  @ApiOperation({ summary: 'Get active journey definition by code' })
+  async getDefinitionByCode(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('code') code: string,
+  ) {
+    const definition = await this.definitionRepository.findActive(tenantId, code);
+    if (!definition) {
+      throw new HttpException(
+        { error: 'DEFINITION_NOT_FOUND' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return definition;
+  }
+
+  @Put('definitions/:id')
+  @ApiOperation({ summary: 'Update journey definition' })
+  async updateDefinition(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateJourneyDefinitionDto,
+  ) {
+    try {
+      return await this.definitionRepository.update(tenantId, id, dto);
+    } catch (error) {
+      throw new HttpException(
+        { error: 'DEFINITION_UPDATE_FAILED', message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  @Delete('definitions/:id')
+  @ApiOperation({ summary: 'Delete journey definition' })
+  async deleteDefinition(
+    @Headers('x-tenant-id') tenantId: string,
+    @Param('id') id: string,
+  ) {
+    try {
+      await this.definitionRepository.delete(tenantId, id);
+      return { deleted: true };
+    } catch (error) {
+      throw new HttpException(
+        { error: 'DEFINITION_DELETE_FAILED', message: error.message },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
   }
 }

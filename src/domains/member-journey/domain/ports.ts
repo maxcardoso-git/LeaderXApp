@@ -2,10 +2,13 @@ import {
   MemberJourneyInstance,
   MemberJourneyTransitionLog,
   MemberApprovalRequest,
+  MemberJourneyDefinition,
   CreateJourneyInstanceInput,
   TransitionStateInput,
   CreateApprovalRequestInput,
   ResolveApprovalInput,
+  CreateJourneyDefinitionInput,
+  UpdateJourneyDefinitionInput,
   JourneyInstanceFilters,
   TransitionLogFilters,
   ApprovalRequestFilters,
@@ -46,6 +49,22 @@ export interface ApprovalRequestRepository {
   search(filters: ApprovalRequestFilters): Promise<PagedResult<MemberApprovalRequest>>;
   findPendingByMember(tenantId: string, memberId: string): Promise<MemberApprovalRequest[]>;
   updateKanbanCardId(tenantId: string, id: string, kanbanCardId: string): Promise<void>;
+}
+
+// ============================================
+// Journey Definition Repository
+// ============================================
+
+export const JOURNEY_DEFINITION_REPOSITORY = Symbol('JOURNEY_DEFINITION_REPOSITORY');
+
+export interface JourneyDefinitionRepository {
+  create(input: CreateJourneyDefinitionInput): Promise<MemberJourneyDefinition>;
+  findById(tenantId: string, id: string): Promise<MemberJourneyDefinition | null>;
+  findByCode(tenantId: string, code: string, version?: string): Promise<MemberJourneyDefinition | null>;
+  findActive(tenantId: string, code: string): Promise<MemberJourneyDefinition | null>;
+  update(tenantId: string, id: string, input: UpdateJourneyDefinitionInput): Promise<MemberJourneyDefinition>;
+  delete(tenantId: string, id: string): Promise<void>;
+  list(tenantId: string): Promise<MemberJourneyDefinition[]>;
 }
 
 // ============================================

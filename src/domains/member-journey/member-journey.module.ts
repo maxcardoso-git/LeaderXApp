@@ -6,6 +6,7 @@ import {
   JOURNEY_INSTANCE_REPOSITORY,
   TRANSITION_LOG_REPOSITORY,
   APPROVAL_REQUEST_REPOSITORY,
+  JOURNEY_DEFINITION_REPOSITORY,
   PLM_INTEGRATION_PORT,
   GOVERNANCE_POLICY_PORT,
 } from './domain';
@@ -15,6 +16,7 @@ import {
   JourneyInstanceRepositoryImpl,
   TransitionLogRepositoryImpl,
   ApprovalRequestRepositoryImpl,
+  JourneyDefinitionRepositoryImpl,
 } from './outbound/repositories';
 
 // Outbound adapters (integrations)
@@ -31,6 +33,8 @@ import {
   GetJourneyInstanceUseCase,
   ListApprovalRequestsUseCase,
   ListTransitionLogsUseCase,
+  ExecuteTriggerUseCase,
+  ExecuteCommandUseCase,
 } from './application/usecases';
 
 // Inbound adapters (controllers)
@@ -57,6 +61,10 @@ const repositoryProviders = [
     provide: GOVERNANCE_POLICY_PORT,
     useClass: GovernancePolicyAdapter,
   },
+  {
+    provide: JOURNEY_DEFINITION_REPOSITORY,
+    useClass: JourneyDefinitionRepositoryImpl,
+  },
 ];
 
 const useCases = [
@@ -68,6 +76,8 @@ const useCases = [
   GetJourneyInstanceUseCase,
   ListApprovalRequestsUseCase,
   ListTransitionLogsUseCase,
+  ExecuteTriggerUseCase,
+  ExecuteCommandUseCase,
 ];
 
 @Module({

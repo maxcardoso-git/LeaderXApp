@@ -127,3 +127,93 @@ export interface PagedResult<T> {
   page: number;
   size: number;
 }
+
+// ============================================
+// Journey Definition (Blueprint)
+// ============================================
+
+export interface JourneyTransitionDef {
+  key: string;
+  from: string;
+  to: string;
+  trigger: string;
+  requiresApproval: boolean;
+  approvalPolicyCode?: string;
+  effects?: {
+    emitEvents?: string[];
+    capabilities?: string[];
+  };
+}
+
+export interface JourneyCommandDef {
+  command: string;
+  trigger?: string;
+  action?: 'CREATE_INSTANCE' | 'FIRE_TRIGGER' | 'RESOLVE_APPROVAL';
+  description?: string;
+}
+
+export interface MemberJourneyDefinition {
+  id: string;
+  tenantId: string;
+  code: string;
+  version: string;
+  name: string;
+  description?: string;
+  initialState: string;
+  states: string[];
+  transitions: JourneyTransitionDef[];
+  commands: JourneyCommandDef[];
+  events: string[];
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateJourneyDefinitionInput {
+  tenantId: string;
+  code: string;
+  version: string;
+  name: string;
+  description?: string;
+  initialState: string;
+  states: string[];
+  transitions: JourneyTransitionDef[];
+  commands?: JourneyCommandDef[];
+  events?: string[];
+}
+
+export interface UpdateJourneyDefinitionInput {
+  name?: string;
+  description?: string;
+  initialState?: string;
+  states?: string[];
+  transitions?: JourneyTransitionDef[];
+  commands?: JourneyCommandDef[];
+  events?: string[];
+  isActive?: boolean;
+}
+
+export interface ExecuteTriggerInput {
+  tenantId: string;
+  journeyInstanceId: string;
+  trigger: string;
+  actorId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ExecuteCommandInput {
+  tenantId: string;
+  memberId: string;
+  command: string;
+  journeyCode?: string;
+  actorId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ExecuteTriggerResult {
+  action: 'TRANSITIONED' | 'APPROVAL_REQUESTED' | 'INSTANCE_CREATED';
+  instance: MemberJourneyInstance;
+  transitionLogId?: string;
+  approvalRequestId?: string;
+  eventsEmitted?: string[];
+}

@@ -6,3 +6,5 @@ export * from './list-journey-instances.usecase';
 export * from './get-journey-instance.usecase';
 export * from './list-approval-requests.usecase';
 export * from './list-transition-logs.usecase';
+export * from './execute-trigger.usecase';
+export * from './execute-command.usecase';

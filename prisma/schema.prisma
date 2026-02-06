@@ -2366,3 +2366,26 @@ model MemberApprovalRequest {
   @@index([tenantId, kanbanCardId])
   @@map("member_approval_requests")
 }
+
+/// MemberJourneyDefinition - Blueprint defining states, transitions, commands
+model MemberJourneyDefinition {
+  id            String   @id @default(uuid())
+  tenantId      String   @map("tenant_id")
+  code          String   // e.g., "MEMBER_LIFECYCLE"
+  version       String   // e.g., "1.0"
+  name          String
+  description   String?
+  initialState  String   @map("initial_state") // e.g., "LEAD"
+  states        Json     // ["LEAD", "ONBOARDING", "PENDING_APPROVAL", ...]
+  transitions   Json     // Array of transition definitions
+  commands      Json?    // Array of command definitions
+  events        Json?    // Array of event definitions
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, code, version])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@map("member_journey_definitions")
+}
