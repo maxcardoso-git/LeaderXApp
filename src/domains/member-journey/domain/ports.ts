@@ -66,3 +66,20 @@ export interface PlmCardCreationInput {
 export interface PlmIntegrationPort {
   createCard(input: PlmCardCreationInput): Promise<{ cardId: string }>;
 }
+
+// ============================================
+// Governance Policy Lookup Port
+// ============================================
+
+export const GOVERNANCE_POLICY_PORT = Symbol('GOVERNANCE_POLICY_PORT');
+
+export interface GovernancePolicyInfo {
+  id: string;
+  code: string;
+  pipelineId: string;
+  blocking: boolean;
+}
+
+export interface GovernancePolicyPort {
+  findByCode(code: string): Promise<GovernancePolicyInfo | null>;
+}

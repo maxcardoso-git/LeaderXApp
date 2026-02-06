@@ -7,6 +7,7 @@ import {
   TRANSITION_LOG_REPOSITORY,
   APPROVAL_REQUEST_REPOSITORY,
   PLM_INTEGRATION_PORT,
+  GOVERNANCE_POLICY_PORT,
 } from './domain';
 
 // Outbound adapters (repositories)
@@ -18,6 +19,7 @@ import {
 
 // Outbound adapters (integrations)
 import { PlmIntegrationAdapter } from './outbound/adapters/plm-integration.adapter';
+import { GovernancePolicyAdapter } from './outbound/adapters/governance-policy.adapter';
 
 // Application use cases
 import {
@@ -50,6 +52,10 @@ const repositoryProviders = [
   {
     provide: PLM_INTEGRATION_PORT,
     useClass: PlmIntegrationAdapter,
+  },
+  {
+    provide: GOVERNANCE_POLICY_PORT,
+    useClass: GovernancePolicyAdapter,
   },
 ];
 

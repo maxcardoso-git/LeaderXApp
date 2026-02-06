@@ -182,6 +182,11 @@ export class ApprovalPoliciesController {
       { value: 'DELETE', label: 'Delete' },
       { value: 'INACTIVATE', label: 'Inactivate' },
       { value: 'ACTIVATE', label: 'Activate' },
+      { value: 'PROMOTE', label: 'Promote' },
+      { value: 'SUSPEND', label: 'Suspend' },
+      { value: 'REACTIVATE', label: 'Reactivate' },
+      { value: 'TRANSFER', label: 'Transfer' },
+      { value: 'PUBLISH', label: 'Publish' },
     ];
   }
 

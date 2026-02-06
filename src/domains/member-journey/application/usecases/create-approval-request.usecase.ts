@@ -6,6 +6,8 @@ import {
   JourneyInstanceRepository,
   PLM_INTEGRATION_PORT,
   PlmIntegrationPort,
+  GOVERNANCE_POLICY_PORT,
+  GovernancePolicyPort,
   CreateApprovalRequestInput,
   MemberApprovalRequest,
 } from '../../domain';
@@ -21,6 +23,8 @@ export class CreateApprovalRequestUseCase {
     private readonly journeyRepository: JourneyInstanceRepository,
     @Inject(PLM_INTEGRATION_PORT)
     private readonly plmIntegration: PlmIntegrationPort,
+    @Inject(GOVERNANCE_POLICY_PORT)
+    private readonly governancePolicy: GovernancePolicyPort,
   ) {}
 
   async execute(input: CreateApprovalRequestInput): Promise<MemberApprovalRequest> {
@@ -34,6 +38,18 @@ export class CreateApprovalRequestUseCase {
       throw new Error(`Journey instance ${input.journeyInstanceId} not found`);
     }
 
+    // Resolve pipelineId from governance policy if not explicitly provided
+    let pipelineId = input.pipelineId;
+    if (!pipelineId && input.policyCode) {
+      const policy = await this.governancePolicy.findByCode(input.policyCode);
+      if (policy) {
+        pipelineId = policy.pipelineId;
+        this.logger.log(
+          `Resolved pipelineId ${pipelineId} from policy ${input.policyCode}`,
+        );
+      }
+    }
+
     this.logger.log(
       `Creating approval request for member ${input.memberId}, trigger: ${input.journeyTrigger}`,
     );
@@ -41,12 +57,12 @@ export class CreateApprovalRequestUseCase {
     // Create the approval request
     const request = await this.approvalRepository.create(input);
 
-    // If pipelineId provided, create a PLM card for kanban-based approval
-    if (input.pipelineId) {
+    // If pipelineId resolved (explicit or from policy), create a PLM card
+    if (pipelineId) {
       try {
         const { cardId } = await this.plmIntegration.createCard({
           tenantId: input.tenantId,
-          pipelineId: input.pipelineId,
+          pipelineId,
           title: `[${input.journeyTrigger}] Member ${input.memberId}`,
           description: `Approval request for journey trigger: ${input.journeyTrigger}\nPolicy: ${input.policyCode}`,
           priority: 'MEDIUM',
@@ -76,7 +92,6 @@ export class CreateApprovalRequestUseCase {
         this.logger.error(
           `Failed to create PLM card for approval ${request.id}: ${error.message}`,
         );
-        // Don't fail the approval request creation if PLM card creation fails
       }
     }
 
