@@ -41,7 +41,28 @@ export const APPROVAL_REQUEST_REPOSITORY = Symbol('APPROVAL_REQUEST_REPOSITORY')
 export interface ApprovalRequestRepository {
   create(input: CreateApprovalRequestInput): Promise<MemberApprovalRequest>;
   findById(tenantId: string, id: string): Promise<MemberApprovalRequest | null>;
+  findByKanbanCardId(tenantId: string, kanbanCardId: string): Promise<MemberApprovalRequest | null>;
   resolve(input: ResolveApprovalInput): Promise<MemberApprovalRequest>;
   search(filters: ApprovalRequestFilters): Promise<PagedResult<MemberApprovalRequest>>;
   findPendingByMember(tenantId: string, memberId: string): Promise<MemberApprovalRequest[]>;
+  updateKanbanCardId(tenantId: string, id: string, kanbanCardId: string): Promise<void>;
+}
+
+// ============================================
+// PLM Integration Port
+// ============================================
+
+export const PLM_INTEGRATION_PORT = Symbol('PLM_INTEGRATION_PORT');
+
+export interface PlmCardCreationInput {
+  tenantId: string;
+  pipelineId: string;
+  title: string;
+  description?: string;
+  priority?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface PlmIntegrationPort {
+  createCard(input: PlmCardCreationInput): Promise<{ cardId: string }>;
 }

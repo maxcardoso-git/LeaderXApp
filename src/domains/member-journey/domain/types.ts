@@ -78,6 +78,7 @@ export interface CreateApprovalRequestInput {
   journeyInstanceId: string;
   journeyTrigger: string;
   policyCode: string;
+  pipelineId?: string;
   kanbanCardId?: string;
   metadata?: Record<string, unknown>;
 }

@@ -6,6 +6,7 @@ import {
   JOURNEY_INSTANCE_REPOSITORY,
   TRANSITION_LOG_REPOSITORY,
   APPROVAL_REQUEST_REPOSITORY,
+  PLM_INTEGRATION_PORT,
 } from './domain';
 
 // Outbound adapters (repositories)
@@ -14,6 +15,9 @@ import {
   TransitionLogRepositoryImpl,
   ApprovalRequestRepositoryImpl,
 } from './outbound/repositories';
+
+// Outbound adapters (integrations)
+import { PlmIntegrationAdapter } from './outbound/adapters/plm-integration.adapter';
 
 // Application use cases
 import {
@@ -42,6 +46,10 @@ const repositoryProviders = [
   {
     provide: APPROVAL_REQUEST_REPOSITORY,
     useClass: ApprovalRequestRepositoryImpl,
+  },
+  {
+    provide: PLM_INTEGRATION_PORT,
+    useClass: PlmIntegrationAdapter,
   },
 ];
 

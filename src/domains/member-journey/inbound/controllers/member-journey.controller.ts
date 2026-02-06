@@ -10,6 +10,8 @@ import {
   HttpCode,
   HttpStatus,
   HttpException,
+  Inject,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader, ApiQuery } from '@nestjs/swagger';
 import {
@@ -22,7 +24,12 @@ import {
   ListApprovalRequestsUseCase,
   ListTransitionLogsUseCase,
 } from '../../application/usecases';
-import { JourneyTransitionOrigin, ApprovalStatus } from '../../domain';
+import {
+  JourneyTransitionOrigin,
+  ApprovalStatus,
+  APPROVAL_REQUEST_REPOSITORY,
+  ApprovalRequestRepository,
+} from '../../domain';
 
 // ============================================
 // DTOs
@@ -49,7 +56,19 @@ class CreateApprovalRequestDto {
   journeyInstanceId: string;
   journeyTrigger: string;
   policyCode: string;
+  pipelineId?: string;
   kanbanCardId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+class PlmCardMovedWebhookDto {
+  cardId: string;
+  pipelineId: string;
+  fromStageId?: string;
+  toStageId: string;
+  toStageName: string;
+  approvalOutcome?: 'APPROVE' | 'REJECT' | 'CANCEL';
+  movedBy?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -67,7 +86,11 @@ class ResolveApprovalDto {
 @Controller('member-journey')
 @ApiHeader({ name: 'X-Tenant-Id', required: true })
 export class MemberJourneyController {
+  private readonly logger = new Logger(MemberJourneyController.name);
+
   constructor(
+    @Inject(APPROVAL_REQUEST_REPOSITORY)
+    private readonly approvalRepository: ApprovalRequestRepository,
     private readonly createJourneyInstance: CreateJourneyInstanceUseCase,
     private readonly transitionState: TransitionStateUseCase,
     private readonly createApprovalRequest: CreateApprovalRequestUseCase,
@@ -254,6 +277,7 @@ export class MemberJourneyController {
         journeyInstanceId: dto.journeyInstanceId,
         journeyTrigger: dto.journeyTrigger,
         policyCode: dto.policyCode,
+        pipelineId: dto.pipelineId,
         kanbanCardId: dto.kanbanCardId,
         metadata: dto.metadata,
       });
@@ -325,5 +349,76 @@ export class MemberJourneyController {
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  // ============================================
+  // PLM Webhook (called by PLM triggers)
+  // ============================================
+
+  @Post('webhooks/plm-card-moved')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Webhook: PLM card moved to approval stage' })
+  async onPlmCardMoved(
+    @Headers('x-tenant-id') tenantId: string,
+    @Body() dto: PlmCardMovedWebhookDto,
+  ) {
+    this.logger.log(
+      `PLM webhook: card ${dto.cardId} moved to stage ${dto.toStageName} (outcome: ${dto.approvalOutcome})`,
+    );
+
+    // Find the approval request linked to this card
+    const approval = await this.approvalRepository.findByKanbanCardId(
+      tenantId,
+      dto.cardId,
+    );
+
+    if (!approval) {
+      this.logger.warn(`No approval request found for PLM card ${dto.cardId}`);
+      return { processed: false, reason: 'NO_LINKED_APPROVAL' };
+    }
+
+    if (approval.status !== 'PENDING') {
+      this.logger.warn(`Approval ${approval.id} already resolved: ${approval.status}`);
+      return { processed: false, reason: 'ALREADY_RESOLVED' };
+    }
+
+    // Map PLM approval outcome to approval status
+    if (!dto.approvalOutcome) {
+      return { processed: false, reason: 'NO_APPROVAL_OUTCOME' };
+    }
+
+    if (dto.approvalOutcome === 'APPROVE') {
+      const targetState = (dto.metadata?.targetState as string) ||
+        (approval.metadata as any)?.targetState;
+
+      const result = await this.resolveApproval.execute(
+        {
+          tenantId,
+          approvalRequestId: approval.id,
+          status: 'APPROVED',
+          resolvedBy: dto.movedBy || 'PLM_SYSTEM',
+        },
+        targetState,
+      );
+
+      this.logger.log(`Approval ${approval.id} APPROVED via PLM card ${dto.cardId}`);
+      return { processed: true, approvalId: approval.id, outcome: 'APPROVED', transitionApplied: result.transitionApplied };
+    }
+
+    if (dto.approvalOutcome === 'REJECT' || dto.approvalOutcome === 'CANCEL') {
+      await this.resolveApproval.execute(
+        {
+          tenantId,
+          approvalRequestId: approval.id,
+          status: 'REJECTED',
+          resolvedBy: dto.movedBy || 'PLM_SYSTEM',
+        },
+      );
+
+      this.logger.log(`Approval ${approval.id} REJECTED via PLM card ${dto.cardId}`);
+      return { processed: true, approvalId: approval.id, outcome: 'REJECTED' };
+    }
+
+    return { processed: false, reason: 'UNKNOWN_OUTCOME' };
   }
 }

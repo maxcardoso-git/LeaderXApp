@@ -89,6 +89,21 @@ export class ApprovalRequestRepositoryImpl implements ApprovalRequestRepository 
     };
   }
 
+  async findByKanbanCardId(tenantId: string, kanbanCardId: string): Promise<MemberApprovalRequest | null> {
+    const request = await this.prisma.memberApprovalRequest.findFirst({
+      where: { tenantId, kanbanCardId },
+    });
+
+    return request ? this.mapToEntity(request) : null;
+  }
+
+  async updateKanbanCardId(tenantId: string, id: string, kanbanCardId: string): Promise<void> {
+    await this.prisma.memberApprovalRequest.update({
+      where: { id },
+      data: { kanbanCardId },
+    });
+  }
+
   async findPendingByMember(tenantId: string, memberId: string): Promise<MemberApprovalRequest[]> {
     const requests = await this.prisma.memberApprovalRequest.findMany({
       where: { tenantId, memberId, status: 'PENDING' },
