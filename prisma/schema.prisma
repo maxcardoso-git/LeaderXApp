@@ -2284,3 +2284,85 @@ model SystemCapability {
   @@index([tenantId, isActive])
   @@map("system_capabilities")
 }
+
+// ============================================
+// MEMBER JOURNEY DOMAIN - Runtime
+// ============================================
+
+/// MemberJourneyInstance - Active journey instance for a member
+model MemberJourneyInstance {
+  id             String   @id @default(uuid())
+  tenantId       String   @map("tenant_id")
+  memberId       String   @map("member_id")
+  journeyCode    String   @map("journey_code") // e.g., "MEMBER_LIFECYCLE_DEFAULT"
+  journeyVersion String   @map("journey_version") // e.g., "v1"
+  currentState   String   @map("current_state") // e.g., "ONBOARDING", "ACTIVE", "SUSPENDED"
+  metadata       Json?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  transitionLogs MemberJourneyTransitionLog[]
+  approvalRequests MemberApprovalRequest[]
+
+  @@unique([tenantId, memberId, journeyCode])
+  @@index([tenantId])
+  @@index([tenantId, memberId])
+  @@index([tenantId, currentState])
+  @@index([tenantId, journeyCode])
+  @@map("member_journey_instances")
+}
+
+/// MemberJourneyTransitionLog - State transition history
+model MemberJourneyTransitionLog {
+  id                String   @id @default(uuid())
+  tenantId          String   @map("tenant_id")
+  memberId          String   @map("member_id")
+  journeyInstanceId String   @map("journey_instance_id")
+  fromState         String?  @map("from_state")
+  toState           String   @map("to_state")
+  trigger           String   // e.g., "PROMOTE", "SUSPEND", "REACTIVATE"
+  origin            String   // USER | ADMIN | SYSTEM | APPROVAL_ENGINE
+  actorId           String?  @map("actor_id")
+  approvalRequestId String?  @map("approval_request_id")
+  metadata          Json?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  journeyInstance   MemberJourneyInstance @relation(fields: [journeyInstanceId], references: [id], onDelete: Cascade)
+  approvalRequest   MemberApprovalRequest? @relation(fields: [approvalRequestId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, memberId])
+  @@index([journeyInstanceId])
+  @@index([tenantId, trigger])
+  @@index([tenantId, origin])
+  @@map("member_journey_transition_logs")
+}
+
+/// MemberApprovalRequest - Approval requests for journey transitions
+model MemberApprovalRequest {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  memberId       String    @map("member_id")
+  journeyInstanceId String @map("journey_instance_id")
+  journeyTrigger String    @map("journey_trigger") // e.g., "PROMOTE_TO_SILVER"
+  policyCode     String    @map("policy_code") // e.g., "PROMOTION_APPROVAL"
+  status         String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  kanbanCardId   String?   @map("kanban_card_id") // PLM integration
+  metadata       Json?
+  createdAt      DateTime  @default(now()) @map("created_at")
+  resolvedAt     DateTime? @map("resolved_at")
+  resolvedBy     String?   @map("resolved_by")
+
+  // Relations
+  journeyInstance MemberJourneyInstance @relation(fields: [journeyInstanceId], references: [id], onDelete: Cascade)
+  transitionLogs  MemberJourneyTransitionLog[]
+
+  @@index([tenantId])
+  @@index([tenantId, memberId])
+  @@index([tenantId, status])
+  @@index([journeyInstanceId])
+  @@index([tenantId, kanbanCardId])
+  @@map("member_approval_requests")
+}

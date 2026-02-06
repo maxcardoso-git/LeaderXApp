@@ -47,6 +47,9 @@ import { PlmModule } from './domains/plm';
 // System Domain
 import { SystemModule } from './domains/system';
 
+// Member Journey Domain
+import { MemberJourneyModule } from './domains/member-journey';
+
 // Outbox Module (for background event processing)
 import { OutboxModule } from './common/outbox/outbox.module';
 
@@ -69,6 +72,7 @@ import { OutboxModule } from './common/outbox/outbox.module';
     FormStudioModule,
     PlmModule,
     SystemModule,
+    MemberJourneyModule,
   ],
   controllers: [ApprovalsController],
   providers: [
