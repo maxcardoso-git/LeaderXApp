@@ -213,6 +213,38 @@ model PointHold {
 }
 
 // ============================================
+// CONCILIATION NOTIFICATIONS
+// ============================================
+
+/// Notificações internas de anomalias detectadas pela conciliação do Ledger
+model ConciliationNotification {
+  id              String    @id @default(uuid())
+  tenantId        String    @map("tenant_id")
+  code            String    // LEDGER_WITHOUT_APPROVAL | APPROVAL_WITHOUT_LEDGER | JOURNEY_WITHOUT_OUTCOME | REVERSAL_OUTLIER | INTEGRATION_ERRORS
+  severity        String    // CRITICAL | WARNING | INFO
+  title           String
+  description     String
+  anomalyId       String    @map("anomaly_id") // ID da anomalia que gerou a notificação
+  anomalyType     String    @map("anomaly_type")
+  status          String    @default("NEW") // NEW | ACKNOWLEDGED | RESOLVED
+  persistent      Boolean   @default(true)
+  requiresAck     Boolean   @default(true) @map("requires_ack")
+  autoResolve     Boolean   @default(false) @map("auto_resolve")
+  link            String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  acknowledgedAt  DateTime? @map("acknowledged_at")
+  acknowledgedBy  String?   @map("acknowledged_by")
+  resolvedAt      DateTime? @map("resolved_at")
+  resolvedBy      String?   @map("resolved_by")
+
+  @@index([tenantId, status])
+  @@index([tenantId, code])
+  @@index([tenantId, anomalyId])
+  @@unique([tenantId, anomalyId]) // Uma notificação por anomalia
+  @@map("conciliation_notifications")
+}
+
+// ============================================
 // IDEMPOTENCY (Cross-domain)
 // ============================================
 

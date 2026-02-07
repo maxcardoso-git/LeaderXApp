@@ -32,9 +32,103 @@ export interface PaginatedAnomaliesResult {
   total: number;
 }
 
+// Notification types config from spec
+const NOTIFICATION_CONFIG: Record<string, {
+  code: string;
+  severity: 'CRITICAL' | 'WARNING' | 'INFO';
+  title: string;
+  description: string;
+  persistent: boolean;
+  requiresAck: boolean;
+  autoResolve: boolean;
+}> = {
+  LEDGER_WITHOUT_APPROVAL: {
+    code: 'LEDGER_WITHOUT_APPROVAL',
+    severity: 'CRITICAL',
+    title: 'Lançamento de pontos sem aprovação',
+    description: 'Foi detectado um lançamento no Ledger que exige aprovação, mas não possui Approval Request associado.',
+    persistent: true,
+    requiresAck: true,
+    autoResolve: false,
+  },
+  APPROVAL_WITHOUT_LEDGER: {
+    code: 'APPROVAL_WITHOUT_LEDGER',
+    severity: 'WARNING',
+    title: 'Aprovação sem lançamento no Ledger',
+    description: 'Uma aprovação foi concluída, mas não foi identificado lançamento correspondente no Ledger dentro do SLA.',
+    persistent: true,
+    requiresAck: true,
+    autoResolve: false,
+  },
+  JOURNEY_WITHOUT_OUTCOME: {
+    code: 'JOURNEY_WITHOUT_OUTCOME',
+    severity: 'INFO',
+    title: 'Evento de jornada sem consequência',
+    description: 'Um trigger de jornada ocorreu, mas não gerou aprovação nem lançamento de pontos.',
+    persistent: false,
+    requiresAck: false,
+    autoResolve: true,
+  },
+  REVERSAL_OUTLIER: {
+    code: 'REVERSAL_OUTLIER',
+    severity: 'WARNING',
+    title: 'Padrão anômalo de reversões',
+    description: 'Foi detectado um volume atípico de reversões de pontos para um mesmo operador ou trigger.',
+    persistent: true,
+    requiresAck: true,
+    autoResolve: false,
+  },
+  INTEGRATION_ERRORS: {
+    code: 'INTEGRATION_ERRORS',
+    severity: 'INFO',
+    title: 'Erros técnicos recorrentes',
+    description: 'Foram detectadas falhas técnicas recorrentes na integração de Pontos / Ledger.',
+    persistent: false,
+    requiresAck: false,
+    autoResolve: true,
+  },
+};
+
+export interface ConciliationNotification {
+  id: string;
+  tenantId: string;
+  code: string;
+  severity: string;
+  title: string;
+  description: string;
+  anomalyId: string;
+  anomalyType: string;
+  status: 'NEW' | 'ACKNOWLEDGED' | 'RESOLVED';
+  persistent: boolean;
+  requiresAck: boolean;
+  autoResolve: boolean;
+  link: string | null;
+  createdAt: string;
+  acknowledgedAt: string | null;
+  acknowledgedBy: string | null;
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+}
+
+export interface PaginatedNotificationsResult {
+  items: ConciliationNotification[];
+  page: number;
+  size: number;
+  total: number;
+}
+
+export interface NotificationCountResult {
+  total: number;
+  new: number;
+  acknowledged: number;
+  resolved: number;
+}
+
 @Injectable()
 export class ConciliationHandler {
   constructor(private readonly prisma: PrismaService) {}
+
+  // ─── Summary ──────────────────────────────────────────────
 
   async getSummary(tenantId: string): Promise<ConciliationSummary> {
     const thirtyDaysAgo = new Date();
@@ -47,7 +141,6 @@ export class ConciliationHandler {
       totalPosted,
       totalReversed,
     ] = await Promise.all([
-      // Entries with journeyCode but no approvalPolicyCode (should have been approved)
       this.prisma.pointLedgerEntry.count({
         where: {
           tenantId,
@@ -56,8 +149,6 @@ export class ConciliationHandler {
           status: 'POSTED',
         },
       }),
-      // Count approval requests that don't have matching ledger entries
-      // (approximation: entries with approvalRequestId that are REVERSED)
       this.prisma.pointLedgerEntry.count({
         where: {
           tenantId,
@@ -65,7 +156,6 @@ export class ConciliationHandler {
           status: 'REVERSED',
         },
       }),
-      // Reversals in last 30 days
       this.prisma.pointLedgerEntry.count({
         where: {
           tenantId,
@@ -73,11 +163,9 @@ export class ConciliationHandler {
           createdAt: { gte: thirtyDaysAgo },
         },
       }),
-      // Total posted
       this.prisma.pointLedgerEntry.count({
         where: { tenantId, status: 'POSTED' },
       }),
-      // Total reversed
       this.prisma.pointLedgerEntry.count({
         where: { tenantId, status: 'REVERSED' },
       }),
@@ -95,6 +183,8 @@ export class ConciliationHandler {
     };
   }
 
+  // ─── Anomalies ────────────────────────────────────────────
+
   async listAnomalies(
     tenantId: string,
     filters: {
@@ -109,7 +199,6 @@ export class ConciliationHandler {
     const size = filters.size ?? 20;
     const anomalies: ConciliationAnomaly[] = [];
 
-    // Detect anomaly type: LEDGER_WITHOUT_APPROVAL
     if (!filters.type || filters.type === 'LEDGER_WITHOUT_APPROVAL') {
       const entries = await this.prisma.pointLedgerEntry.findMany({
         where: {
@@ -138,7 +227,6 @@ export class ConciliationHandler {
       }
     }
 
-    // Detect anomaly type: REVERSAL_OUTLIER (entries reversed very quickly)
     if (!filters.type || filters.type === 'REVERSAL_OUTLIER') {
       const reversedEntries = await this.prisma.pointLedgerEntry.findMany({
         where: {
@@ -167,7 +255,6 @@ export class ConciliationHandler {
       }
     }
 
-    // Detect anomaly type: JOURNEY_WITHOUT_OUTCOME (entries without journeyCode)
     if (!filters.type || filters.type === 'JOURNEY_WITHOUT_OUTCOME') {
       const orphanEntries = await this.prisma.pointLedgerEntry.findMany({
         where: {
@@ -194,14 +281,12 @@ export class ConciliationHandler {
       }
     }
 
-    // Filter by severity
     const filtered = anomalies.filter((a) => {
       if (filters.severity && a.severity !== filters.severity) return false;
       if (filters.status && a.status !== filters.status) return false;
       return true;
     });
 
-    // Sort by detectedAt desc
     filtered.sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime());
 
     const total = filtered.length;
@@ -214,7 +299,6 @@ export class ConciliationHandler {
     tenantId: string,
     anomalyId: string,
   ): Promise<ConciliationAnomaly | null> {
-    // Parse anomaly ID to get the type prefix and entry ID
     const dashIndex = anomalyId.indexOf('-');
     if (dashIndex === -1) return null;
 
@@ -275,6 +359,258 @@ export class ConciliationHandler {
         reversedById: entry.reversedById,
         reversalOfId: entry.reversalOfId,
       }, null, 2),
+    };
+  }
+
+  // ─── Notifications ────────────────────────────────────────
+
+  /**
+   * Sync notifications: detect anomalies and upsert notifications.
+   * - Creates NEW notifications for newly detected anomalies.
+   * - Auto-resolves notifications for autoResolve types when anomaly is no longer detected.
+   */
+  async syncNotifications(tenantId: string): Promise<{ created: number; autoResolved: number }> {
+    const anomalies = await this.listAnomalies(tenantId, { size: 200 });
+    const detectedAnomalyIds = new Set(anomalies.items.map((a) => a.id));
+
+    let created = 0;
+
+    // Upsert notifications for each detected anomaly
+    for (const anomaly of anomalies.items) {
+      const config = NOTIFICATION_CONFIG[anomaly.type];
+      if (!config) continue;
+
+      const existing = await this.prisma.conciliationNotification.findUnique({
+        where: { tenantId_anomalyId: { tenantId, anomalyId: anomaly.id } },
+      });
+
+      if (!existing) {
+        await this.prisma.conciliationNotification.create({
+          data: {
+            tenantId,
+            code: config.code,
+            severity: config.severity,
+            title: config.title,
+            description: anomaly.description,
+            anomalyId: anomaly.id,
+            anomalyType: anomaly.type,
+            status: 'NEW',
+            persistent: config.persistent,
+            requiresAck: config.requiresAck,
+            autoResolve: config.autoResolve,
+            link: `/conciliation/${anomaly.id}`,
+          },
+        });
+        created++;
+      }
+    }
+
+    // Auto-resolve: find notifications with autoResolve=true whose anomaly is no longer detected
+    let autoResolved = 0;
+    const autoResolveNotifications = await this.prisma.conciliationNotification.findMany({
+      where: {
+        tenantId,
+        autoResolve: true,
+        status: { not: 'RESOLVED' },
+      },
+    });
+
+    for (const notif of autoResolveNotifications) {
+      if (!detectedAnomalyIds.has(notif.anomalyId)) {
+        await this.prisma.conciliationNotification.update({
+          where: { id: notif.id },
+          data: {
+            status: 'RESOLVED',
+            resolvedAt: new Date(),
+            resolvedBy: 'SYSTEM',
+          },
+        });
+        autoResolved++;
+      }
+    }
+
+    return { created, autoResolved };
+  }
+
+  async listNotifications(
+    tenantId: string,
+    filters: {
+      status?: string;
+      code?: string;
+      severity?: string;
+      page?: number;
+      size?: number;
+    },
+  ): Promise<PaginatedNotificationsResult> {
+    const page = filters.page ?? 0;
+    const size = filters.size ?? 20;
+
+    const where: Record<string, unknown> = { tenantId };
+    if (filters.status) where.status = filters.status;
+    if (filters.code) where.code = filters.code;
+    if (filters.severity) where.severity = filters.severity;
+
+    const [items, total] = await Promise.all([
+      this.prisma.conciliationNotification.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: page * size,
+        take: size,
+      }),
+      this.prisma.conciliationNotification.count({ where }),
+    ]);
+
+    return {
+      items: items.map((n) => ({
+        id: n.id,
+        tenantId: n.tenantId,
+        code: n.code,
+        severity: n.severity,
+        title: n.title,
+        description: n.description,
+        anomalyId: n.anomalyId,
+        anomalyType: n.anomalyType,
+        status: n.status as 'NEW' | 'ACKNOWLEDGED' | 'RESOLVED',
+        persistent: n.persistent,
+        requiresAck: n.requiresAck,
+        autoResolve: n.autoResolve,
+        link: n.link,
+        createdAt: n.createdAt.toISOString(),
+        acknowledgedAt: n.acknowledgedAt?.toISOString() ?? null,
+        acknowledgedBy: n.acknowledgedBy,
+        resolvedAt: n.resolvedAt?.toISOString() ?? null,
+        resolvedBy: n.resolvedBy,
+      })),
+      page,
+      size,
+      total,
+    };
+  }
+
+  async getNotificationCounts(tenantId: string): Promise<NotificationCountResult> {
+    const [total, newCount, acknowledged, resolved] = await Promise.all([
+      this.prisma.conciliationNotification.count({ where: { tenantId } }),
+      this.prisma.conciliationNotification.count({ where: { tenantId, status: 'NEW' } }),
+      this.prisma.conciliationNotification.count({ where: { tenantId, status: 'ACKNOWLEDGED' } }),
+      this.prisma.conciliationNotification.count({ where: { tenantId, status: 'RESOLVED' } }),
+    ]);
+
+    return { total, new: newCount, acknowledged, resolved };
+  }
+
+  async getNotification(
+    tenantId: string,
+    notificationId: string,
+  ): Promise<ConciliationNotification | null> {
+    const n = await this.prisma.conciliationNotification.findFirst({
+      where: { id: notificationId, tenantId },
+    });
+
+    if (!n) return null;
+
+    return {
+      id: n.id,
+      tenantId: n.tenantId,
+      code: n.code,
+      severity: n.severity,
+      title: n.title,
+      description: n.description,
+      anomalyId: n.anomalyId,
+      anomalyType: n.anomalyType,
+      status: n.status as 'NEW' | 'ACKNOWLEDGED' | 'RESOLVED',
+      persistent: n.persistent,
+      requiresAck: n.requiresAck,
+      autoResolve: n.autoResolve,
+      link: n.link,
+      createdAt: n.createdAt.toISOString(),
+      acknowledgedAt: n.acknowledgedAt?.toISOString() ?? null,
+      acknowledgedBy: n.acknowledgedBy,
+      resolvedAt: n.resolvedAt?.toISOString() ?? null,
+      resolvedBy: n.resolvedBy,
+    };
+  }
+
+  async acknowledgeNotification(
+    tenantId: string,
+    notificationId: string,
+    userId: string,
+  ): Promise<ConciliationNotification | null> {
+    const n = await this.prisma.conciliationNotification.findFirst({
+      where: { id: notificationId, tenantId },
+    });
+
+    if (!n || n.status !== 'NEW') return null;
+
+    const updated = await this.prisma.conciliationNotification.update({
+      where: { id: notificationId },
+      data: {
+        status: 'ACKNOWLEDGED',
+        acknowledgedAt: new Date(),
+        acknowledgedBy: userId,
+      },
+    });
+
+    return {
+      id: updated.id,
+      tenantId: updated.tenantId,
+      code: updated.code,
+      severity: updated.severity,
+      title: updated.title,
+      description: updated.description,
+      anomalyId: updated.anomalyId,
+      anomalyType: updated.anomalyType,
+      status: updated.status as 'NEW' | 'ACKNOWLEDGED' | 'RESOLVED',
+      persistent: updated.persistent,
+      requiresAck: updated.requiresAck,
+      autoResolve: updated.autoResolve,
+      link: updated.link,
+      createdAt: updated.createdAt.toISOString(),
+      acknowledgedAt: updated.acknowledgedAt?.toISOString() ?? null,
+      acknowledgedBy: updated.acknowledgedBy,
+      resolvedAt: updated.resolvedAt?.toISOString() ?? null,
+      resolvedBy: updated.resolvedBy,
+    };
+  }
+
+  async resolveNotification(
+    tenantId: string,
+    notificationId: string,
+    userId: string,
+  ): Promise<ConciliationNotification | null> {
+    const n = await this.prisma.conciliationNotification.findFirst({
+      where: { id: notificationId, tenantId },
+    });
+
+    if (!n || n.status === 'RESOLVED') return null;
+
+    const updated = await this.prisma.conciliationNotification.update({
+      where: { id: notificationId },
+      data: {
+        status: 'RESOLVED',
+        resolvedAt: new Date(),
+        resolvedBy: userId,
+      },
+    });
+
+    return {
+      id: updated.id,
+      tenantId: updated.tenantId,
+      code: updated.code,
+      severity: updated.severity,
+      title: updated.title,
+      description: updated.description,
+      anomalyId: updated.anomalyId,
+      anomalyType: updated.anomalyType,
+      status: updated.status as 'NEW' | 'ACKNOWLEDGED' | 'RESOLVED',
+      persistent: updated.persistent,
+      requiresAck: updated.requiresAck,
+      autoResolve: updated.autoResolve,
+      link: updated.link,
+      createdAt: updated.createdAt.toISOString(),
+      acknowledgedAt: updated.acknowledgedAt?.toISOString() ?? null,
+      acknowledgedBy: updated.acknowledgedBy,
+      resolvedAt: updated.resolvedAt?.toISOString() ?? null,
+      resolvedBy: updated.resolvedBy,
     };
   }
 }
