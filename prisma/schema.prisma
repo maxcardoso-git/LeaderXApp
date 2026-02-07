@@ -2306,7 +2306,7 @@ model SystemResource {
   @@map("system_resources")
 }
 
-/// SystemCapability - Execution units that wrap SystemResource calls for workflow automation
+/// SystemCapability - Execution units that wrap SystemResource calls for MCP/workflow automation
 model SystemCapability {
   id                String        @id @default(uuid())
   tenantId          String        @map("tenant_id")
@@ -2316,17 +2316,33 @@ model SystemCapability {
   systemResourceId  String        @map("system_resource_id")
   systemResource    SystemResource @relation(fields: [systemResourceId], references: [id], onDelete: Cascade)
 
+  // Classification
+  category          String?       // POINTS, JOURNEY, NETWORK, SYSTEM, FINANCIAL, COMMUNICATION
+  visibility        String        @default("INTERNAL") // INTERNAL, EXTERNAL, RESTRICTED
+
   // Payload Schema Definition
   inputSchema       Json?         @map("input_schema")  // JSON Schema for input validation
   outputSchema      Json?         @map("output_schema") // JSON Schema for output validation
 
+  // Sanitization Layer (Semantic Firewall)
+  forbiddenFlags    String[]      @default([]) @map("forbidden_flags")    // Params the LLM must not send
+  fixedArgs         Json?         @map("fixed_args")                       // Mandatory args injected automatically { key: value }
+  sanitizationRules Json?         @map("sanitization_rules")               // Remediation table: [{ flag, action, value?, targetFlag?, context? }]
+
   // Execution Configuration
   timeout           Int?          // Timeout in milliseconds
+  maxTimeout        Int?          @map("max_timeout")        // Maximum timeout cap (e.g., 540000ms)
   retryPolicy       Json?         @map("retry_policy")  // { maxRetries, backoffMs }
+  rateLimitPerMin   Int?          @map("rate_limit_per_min") // Rate limit per minute
+  requiresApproval  Boolean       @default(false) @map("requires_approval") // Requires approval before execution
 
   // Cache Configuration
   cacheEnabled      Boolean       @default(false) @map("cache_enabled")
   cacheExpirationHours Int?       @map("cache_expiration_hours") // Cache TTL in hours
+
+  // Observability
+  auditEnabled      Boolean       @default(true) @map("audit_enabled")
+  auditLevel        String        @default("BASIC") @map("audit_level") // BASIC, FULL, DEBUG
 
   // Workflow Integration
   metadata          Json?         // Future: workflow trigger associations
@@ -2345,6 +2361,7 @@ model SystemCapability {
   @@index([tenantId])
   @@index([tenantId, systemResourceId])
   @@index([tenantId, isActive])
+  @@index([tenantId, category])
   @@map("system_capabilities")
 }
 
