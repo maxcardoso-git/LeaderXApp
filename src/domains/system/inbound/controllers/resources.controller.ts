@@ -28,6 +28,7 @@ import {
   ListResourcesUseCase,
   TestConnectionUseCase,
   TestConnectionPreviewUseCase,
+  LlmCompletionUseCase,
 } from '../../application/usecases';
 import { SystemResourceAggregate } from '../../domain/aggregates';
 import { BearerTokenConfig } from '../../domain/value-objects';
@@ -45,6 +46,7 @@ export class ResourcesController {
     private readonly listResources: ListResourcesUseCase,
     private readonly testConnection: TestConnectionUseCase,
     private readonly testConnectionPreview: TestConnectionPreviewUseCase,
+    private readonly llmCompletion: LlmCompletionUseCase,
   ) {}
 
   private toResourceResponse(resource: SystemResourceAggregate): ResourceResponseDto {
@@ -192,6 +194,21 @@ export class ResourcesController {
       message: result.message,
       testedAt: result.testedAt.toISOString(),
     };
+  }
+
+  @Post(':resourceId/completions')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send a completion request to an LLM resource' })
+  async completion(
+    @Param('resourceId') resourceId: string,
+    @Body() body: { messages: Array<{ role: string; content: string }>; temperature?: number; maxTokens?: number },
+  ): Promise<{ content: string; model: string; provider: string }> {
+    return this.llmCompletion.execute({
+      resourceId,
+      messages: body.messages,
+      temperature: body.temperature,
+      maxTokens: body.maxTokens,
+    });
   }
 
   @Post('test-preview')

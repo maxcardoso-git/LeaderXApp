@@ -21,6 +21,7 @@ import {
   BasicAuthConfig,
   OAuth2Config,
   LLMConfig,
+  LLMProvider,
   TestConnectionResult,
 } from '../../domain/value-objects';
 import {
@@ -539,5 +540,145 @@ export class TestConnectionPreviewUseCase {
         testedAt: new Date(),
       };
     }
+  }
+}
+
+// ================== LLM Completion ==================
+
+export interface LlmCompletionInput {
+  resourceId: string;
+  messages: Array<{ role: string; content: string }>;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface LlmCompletionResult {
+  content: string;
+  model: string;
+  provider: string;
+}
+
+@Injectable()
+export class LlmCompletionUseCase {
+  private readonly logger = new Logger(LlmCompletionUseCase.name);
+
+  constructor(
+    @Inject(SYSTEM_RESOURCE_REPOSITORY)
+    private readonly resourceRepository: SystemResourceRepositoryPort,
+  ) {}
+
+  async execute(input: LlmCompletionInput): Promise<LlmCompletionResult> {
+    const resource = await this.resourceRepository.findById(input.resourceId);
+    if (!resource) {
+      throw new ResourceNotFoundError(input.resourceId);
+    }
+
+    if (resource.subtype !== ResourceSubtype.LLM) {
+      throw new Error('Resource is not an LLM type');
+    }
+
+    const provider = resource.llmConfig?.provider || LLMProvider.OPENAI;
+    const model = resource.llmConfig?.model || 'gpt-4o-mini';
+
+    // Build auth headers
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    switch (resource.authMode) {
+      case AuthMode.API_KEY:
+        if (resource.apiKeyConfig) {
+          headers[resource.apiKeyConfig.headerName] = resource.apiKeyConfig.apiKey;
+        }
+        break;
+      case AuthMode.BEARER_TOKEN:
+        if (resource.bearerConfig) {
+          headers['Authorization'] = `Bearer ${resource.bearerConfig.token}`;
+        }
+        break;
+      case AuthMode.BASIC_AUTH:
+        if (resource.basicAuthConfig) {
+          const cred = Buffer.from(`${resource.basicAuthConfig.username}:${resource.basicAuthConfig.password}`).toString('base64');
+          headers['Authorization'] = `Basic ${cred}`;
+        }
+        break;
+      default:
+        break;
+    }
+
+    const maxTokens = input.maxTokens || 4000;
+    const temperature = input.temperature ?? 0.7;
+
+    // Build provider-specific request
+    let body: string;
+    let endpoint = resource.endpoint;
+
+    if (provider === LLMProvider.ANTHROPIC) {
+      // Anthropic Messages API
+      const systemMsg = input.messages.find(m => m.role === 'system');
+      const userMessages = input.messages.filter(m => m.role !== 'system');
+      const payload: Record<string, unknown> = {
+        model,
+        messages: userMessages.map(m => ({ role: m.role, content: m.content })),
+        max_tokens: maxTokens,
+        temperature,
+      };
+      if (systemMsg) payload.system = systemMsg.content;
+      // Anthropic requires anthropic-version header
+      headers['anthropic-version'] = '2023-06-01';
+      body = JSON.stringify(payload);
+    } else if (provider === LLMProvider.GOOGLE) {
+      // Google Gemini API
+      const systemMsg = input.messages.find(m => m.role === 'system');
+      const userMessages = input.messages.filter(m => m.role !== 'system');
+      const contents = userMessages.map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      }));
+      const payload: Record<string, unknown> = {
+        contents,
+        generationConfig: { temperature, maxOutputTokens: maxTokens },
+      };
+      if (systemMsg) {
+        payload.systemInstruction = { parts: [{ text: systemMsg.content }] };
+      }
+      body = JSON.stringify(payload);
+    } else {
+      // OpenAI-compatible (OpenAI, Azure, Mistral, Cohere, AWS Bedrock, Other)
+      body = JSON.stringify({
+        model,
+        messages: input.messages.map(m => ({ role: m.role, content: m.content })),
+        max_tokens: maxTokens,
+        temperature,
+      });
+    }
+
+    this.logger.debug(`LLM completion request to ${provider}/${model}`);
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body,
+      signal: AbortSignal.timeout(60000), // 60 second timeout for LLM calls
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => 'Unknown error');
+      this.logger.error(`LLM completion failed: ${response.status} - ${errorText}`);
+      throw new Error(`LLM request failed (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+
+    // Extract content based on provider
+    let content: string;
+    if (provider === LLMProvider.ANTHROPIC) {
+      content = data.content?.[0]?.text || '';
+    } else if (provider === LLMProvider.GOOGLE) {
+      content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    } else {
+      content = data.choices?.[0]?.message?.content || '';
+    }
+
+    this.logger.log(`LLM completion success: ${provider}/${model}, ${content.length} chars`);
+
+    return { content, model, provider };
   }
 }

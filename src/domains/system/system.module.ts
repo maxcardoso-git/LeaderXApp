@@ -16,6 +16,7 @@ import {
   ListResourcesUseCase,
   TestConnectionUseCase,
   TestConnectionPreviewUseCase,
+  LlmCompletionUseCase,
 } from './application/usecases';
 
 // Controllers
@@ -33,6 +34,7 @@ const useCases = [
   ListResourcesUseCase,
   TestConnectionUseCase,
   TestConnectionPreviewUseCase,
+  LlmCompletionUseCase,
 ];
 
 @Module({
