@@ -15,6 +15,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader, ApiQuery } from '@nestjs/swagger';
+import { IsString, IsOptional, IsArray, IsBoolean, IsIn, IsNotEmpty, Allow } from 'class-validator';
 import {
   CreateJourneyInstanceUseCase,
   TransitionStateUseCase,
@@ -41,83 +42,83 @@ import {
 // ============================================
 
 class CreateJourneyInstanceDto {
-  memberId: string;
-  journeyCode: string;
-  journeyVersion?: string;
-  initialState: string;
-  metadata?: Record<string, unknown>;
+  @IsString() @IsNotEmpty() memberId: string;
+  @IsString() @IsNotEmpty() journeyCode: string;
+  @IsString() @IsOptional() journeyVersion?: string;
+  @IsString() @IsNotEmpty() initialState: string;
+  @Allow() @IsOptional() metadata?: Record<string, unknown>;
 }
 
 class TransitionStateDto {
-  trigger: string;
-  toState: string;
-  origin: JourneyTransitionOrigin;
-  actorId?: string;
-  metadata?: Record<string, unknown>;
+  @IsString() @IsNotEmpty() trigger: string;
+  @IsString() @IsNotEmpty() toState: string;
+  @IsString() @IsNotEmpty() origin: JourneyTransitionOrigin;
+  @IsString() @IsOptional() actorId?: string;
+  @Allow() @IsOptional() metadata?: Record<string, unknown>;
 }
 
 class CreateApprovalRequestDto {
-  memberId: string;
-  journeyInstanceId: string;
-  journeyTrigger: string;
-  policyCode: string;
-  pipelineId?: string;
-  kanbanCardId?: string;
-  metadata?: Record<string, unknown>;
+  @IsString() @IsNotEmpty() memberId: string;
+  @IsString() @IsNotEmpty() journeyInstanceId: string;
+  @IsString() @IsNotEmpty() journeyTrigger: string;
+  @IsString() @IsNotEmpty() policyCode: string;
+  @IsString() @IsOptional() pipelineId?: string;
+  @IsString() @IsOptional() kanbanCardId?: string;
+  @Allow() @IsOptional() metadata?: Record<string, unknown>;
 }
 
 class PlmCardMovedWebhookDto {
-  cardId: string;
-  pipelineId: string;
-  fromStageId?: string;
-  toStageId: string;
-  toStageName: string;
-  approvalOutcome?: 'APPROVE' | 'REJECT' | 'CANCEL';
-  movedBy?: string;
-  metadata?: Record<string, unknown>;
+  @IsString() @IsNotEmpty() cardId: string;
+  @IsString() @IsNotEmpty() pipelineId: string;
+  @IsString() @IsOptional() fromStageId?: string;
+  @IsString() @IsNotEmpty() toStageId: string;
+  @IsString() @IsNotEmpty() toStageName: string;
+  @IsIn(['APPROVE', 'REJECT', 'CANCEL']) @IsOptional() approvalOutcome?: 'APPROVE' | 'REJECT' | 'CANCEL';
+  @IsString() @IsOptional() movedBy?: string;
+  @Allow() @IsOptional() metadata?: Record<string, unknown>;
 }
 
 class ResolveApprovalDto {
-  status: 'APPROVED' | 'REJECTED';
-  resolvedBy: string;
-  targetState?: string;
+  @IsIn(['APPROVED', 'REJECTED']) status: 'APPROVED' | 'REJECTED';
+  @IsString() @IsNotEmpty() resolvedBy: string;
+  @IsString() @IsOptional() targetState?: string;
 }
 
 class ExecuteTriggerDto {
-  trigger: string;
-  actorId?: string;
-  metadata?: Record<string, unknown>;
+  @IsString() @IsNotEmpty() trigger: string;
+  @IsString() @IsOptional() actorId?: string;
+  @Allow() @IsOptional() metadata?: Record<string, unknown>;
 }
 
 class ExecuteCommandDto {
-  command: string;
-  memberId: string;
-  journeyCode?: string;
-  actorId?: string;
-  metadata?: Record<string, unknown>;
+  @IsString() @IsNotEmpty() command: string;
+  @IsString() @IsNotEmpty() memberId: string;
+  @IsString() @IsOptional() journeyCode?: string;
+  @IsString() @IsOptional() actorId?: string;
+  @Allow() @IsOptional() metadata?: Record<string, unknown>;
 }
 
 class CreateJourneyDefinitionDto {
-  code: string;
-  version: string;
-  name: string;
-  description?: string;
-  initialState: string;
-  states: string[];
-  transitions: any[];
-  commands?: any[];
-  events?: string[];
+  @IsString() @IsNotEmpty() code: string;
+  @IsString() @IsNotEmpty() version: string;
+  @IsString() @IsNotEmpty() name: string;
+  @IsString() @IsOptional() description?: string;
+  @IsString() @IsNotEmpty() initialState: string;
+  @IsArray() states: string[];
+  @IsArray() transitions: any[];
+  @IsArray() @IsOptional() commands?: any[];
+  @IsArray() @IsOptional() events?: string[];
 }
 
 class UpdateJourneyDefinitionDto {
-  name?: string;
-  description?: string;
-  initialState?: string;
-  states?: string[];
-  transitions?: any[];
-  commands?: any[];
-  events?: string[];
-  isActive?: boolean;
+  @IsString() @IsOptional() name?: string;
+  @IsString() @IsOptional() description?: string;
+  @IsString() @IsOptional() initialState?: string;
+  @IsArray() @IsOptional() states?: string[];
+  @IsArray() @IsOptional() transitions?: any[];
+  @IsArray() @IsOptional() commands?: any[];
+  @IsArray() @IsOptional() events?: string[];
+  @IsBoolean() @IsOptional() isActive?: boolean;
 }
 
 // ============================================
