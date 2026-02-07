@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  kong-migrations:
+    image: kong:3.9
+    command: kong migrations bootstrap
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: host.docker.internal
+      KONG_PG_PORT: 5432
+      KONG_PG_USER: ${KONG_PG_USER:-postgres}
+      KONG_PG_PASSWORD: ${KONG_PG_PASSWORD}
+      KONG_PG_DATABASE: ${KONG_PG_DATABASE:-kong}
+    restart: "no"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  kong-migrations-up:
+    image: kong:3.9
+    command: kong migrations up && kong migrations finish
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: host.docker.internal
+      KONG_PG_PORT: 5432
+      KONG_PG_USER: ${KONG_PG_USER:-postgres}
+      KONG_PG_PASSWORD: ${KONG_PG_PASSWORD}
+      KONG_PG_DATABASE: ${KONG_PG_DATABASE:-kong}
+    restart: "no"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    profiles:
+      - upgrade
+
+  kong:
+    image: kong:3.9
+    container_name: leaderx-kong
+    restart: unless-stopped
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: host.docker.internal
+      KONG_PG_PORT: 5432
+      KONG_PG_USER: ${KONG_PG_USER:-postgres}
+      KONG_PG_PASSWORD: ${KONG_PG_PASSWORD}
+      KONG_PG_DATABASE: ${KONG_PG_DATABASE:-kong}
+      KONG_PROXY_LISTEN: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+      KONG_ADMIN_LISTEN: "127.0.0.1:8001"
+      KONG_ADMIN_GUI_LISTEN: "127.0.0.1:8002"
+      KONG_LOG_LEVEL: info
+      KONG_PLUGINS: bundled
+    ports:
+      - "8000:8000"
+      - "8443:8443"
+      - "8001:8001"
+      - "8002:8002"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      kong-migrations:
+        condition: service_completed_successfully
