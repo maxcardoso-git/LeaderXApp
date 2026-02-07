@@ -42,10 +42,11 @@ import {
   ConciliationHandler,
   PointsPolicyHandler,
   PointsSimulatorHandler,
+  PointQuotationHandler,
 } from './application/handlers';
 
 // Inbound adapters (controllers)
-import { PointsController, PointsLedgerController, ConciliationController, PointsPolicyController, PointsSimulatorController } from './inbound/controllers';
+import { PointsController, PointsLedgerController, ConciliationController, PointsPolicyController, PointsSimulatorController, PointQuotationController } from './inbound/controllers';
 
 const repositoryProviders = [
   {
@@ -98,10 +99,11 @@ const handlers = [
   ConciliationHandler,
   PointsPolicyHandler,
   PointsSimulatorHandler,
+  PointQuotationHandler,
 ];
 
 @Module({
-  controllers: [PointsController, PointsLedgerController, ConciliationController, PointsPolicyController, PointsSimulatorController],
+  controllers: [PointsController, PointsLedgerController, ConciliationController, PointsPolicyController, PointsSimulatorController, PointQuotationController],
   providers: [
     PrismaService,
     ...repositoryProviders,

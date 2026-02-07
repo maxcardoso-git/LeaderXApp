@@ -962,6 +962,30 @@ model PointsPolicy {
   @@map("points_policies")
 }
 
+model PointQuotation {
+  id            String    @id @default(uuid())
+  tenantId      String    @map("tenant_id")
+
+  value         Float
+  currency      String    @default("BRL")
+
+  effectiveFrom DateTime  @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+
+  description   String?
+  reason        String?
+  status        String    @default("ACTIVE") // ACTIVE, DEPRECATED, SCHEDULED
+
+  createdBy     String?   @map("created_by")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("point_quotations")
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, effectiveFrom])
+}
+
 // ============================================
 // TAXONOMY DOMAIN
 // ============================================

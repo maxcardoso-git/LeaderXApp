@@ -13,3 +13,4 @@ export * from './get-member-balance.handler';
 export * from './conciliation.handler';
 export * from './points-policy.handler';
 export * from './points-simulator.handler';
+export * from './point-quotation.handler';
