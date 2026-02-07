@@ -2472,3 +2472,40 @@ model McpToolExecution {
   @@index([toolCode])
   @@index([createdAt])
 }
+
+// ─── MCP Tool Definitions ────────────────────────────────────────────────────
+
+model McpToolDefinition {
+  id                String    @id @default(uuid())
+  tenantId          String    @map("tenant_id")
+  toolCode          String    @unique @map("tool_code")
+  name              String
+  description       String
+  category          String
+  visibility        String    @default("INTERNAL") @map("visibility")
+  serviceCode       String    @map("service_code")
+  method            String
+  path              String
+  inputSchema       Json      @map("input_schema")
+  outputSchema      Json      @map("output_schema")
+  noWrite           Boolean   @default(true) @map("no_write")
+  noApproval        Boolean   @default(false) @map("no_approval")
+  noEventEmission   Boolean   @default(false) @map("no_event_emission")
+  timeoutMs         Int       @default(5000) @map("timeout_ms")
+  auditEnabled      Boolean   @default(true) @map("audit_enabled")
+  auditLevel        String    @default("BASIC") @map("audit_level")
+  status            String    @default("DRAFT")
+  version           Int       @default(1)
+  publishedAt       DateTime? @map("published_at")
+  deprecatedAt      DateTime? @map("deprecated_at")
+  approvalRequestId String?   @map("approval_request_id")
+  createdBy         String    @map("created_by")
+  updatedBy         String?   @map("updated_by")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@map("mcp_tool_definitions")
+  @@index([tenantId])
+  @@index([status])
+  @@index([category])
+}

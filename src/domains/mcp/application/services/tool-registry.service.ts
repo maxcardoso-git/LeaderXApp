@@ -1,15 +1,38 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit, Logger, Inject, Optional } from '@nestjs/common';
 import { McpTool } from '../../domain/types';
 import { MCP_TOOL_CATALOG } from '../../domain/api-catalog';
+import { ToolDefinitionRepository } from '../../outbound/repositories/tool-definition.repository';
 
 @Injectable()
-export class ToolRegistryService {
+export class ToolRegistryService implements OnModuleInit {
+  private readonly logger = new Logger(ToolRegistryService.name);
   private readonly tools: Map<string, McpTool>;
 
-  constructor() {
+  constructor(
+    @Optional() @Inject(ToolDefinitionRepository) private readonly repo?: ToolDefinitionRepository,
+  ) {
     this.tools = new Map();
     for (const tool of MCP_TOOL_CATALOG) {
       this.tools.set(tool.toolCode, tool);
+    }
+  }
+
+  async onModuleInit() {
+    await this.reloadPublishedTools();
+  }
+
+  async reloadPublishedTools(): Promise<void> {
+    if (!this.repo) return;
+
+    try {
+      const published = await this.repo.findPublished();
+      for (const def of published) {
+        const tool = this.repo.toMcpTool(def);
+        this.tools.set(tool.toolCode, tool);
+      }
+      this.logger.log(`Registry loaded: ${this.tools.size} tools (${published.length} from DB)`);
+    } catch (error: any) {
+      this.logger.warn(`Failed to load published tools from DB: ${error.message}`);
     }
   }
 
