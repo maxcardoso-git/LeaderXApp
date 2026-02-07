@@ -1,4 +1,4 @@
-import { Controller, Get, Logger } from '@nestjs/common';
+import { Controller, Get, Param, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -79,6 +79,20 @@ export class GatewayProxyController {
       return response.data;
     } catch (error: any) {
       this.logger.error(`Failed to get Kong services: ${error.message}`);
+      return { data: [], error: error.message };
+    }
+  }
+
+  @Get('consumers/:consumerId/key-auth')
+  @ApiOperation({ summary: 'Get API keys for a Kong consumer' })
+  async getConsumerKeyAuth(@Param('consumerId') consumerId: string) {
+    try {
+      const response = await firstValueFrom(
+        this.httpService.get(`${this.kongAdminUrl}/consumers/${consumerId}/key-auth`),
+      );
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`Failed to get consumer key-auth: ${error.message}`);
       return { data: [], error: error.message };
     }
   }
