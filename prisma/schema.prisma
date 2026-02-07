@@ -536,9 +536,13 @@ model Event {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  phases         EventPhase[]
-  tables         EventTable[]
-  policyBindings EventPolicyBinding[]
+  phases           EventPhase[]
+  tables           EventTable[]
+  policyBindings   EventPolicyBinding[]
+  ticketBatches    TicketBatch[]
+  tickets          Ticket[]
+  invitations      Invitation[]
+  invitationPolicy InvitationPolicy?
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -2549,4 +2553,150 @@ model McpToolDefinition {
   @@index([tenantId])
   @@index([status])
   @@index([category])
+}
+
+// ============================================
+// TICKETS DOMAIN
+// ============================================
+
+/// TicketBatch - represents a commercial batch of tickets for an event
+model TicketBatch {
+  id        String    @id @default(uuid())
+  tenantId  String    @map("tenant_id")
+  eventId   String    @map("event_id")
+
+  name      String
+  price     Float
+  quantity  Int
+  openDate  DateTime  @map("open_date")
+  closeDate DateTime? @map("close_date")
+  sortOrder Int       @default(0) @map("sort_order")
+  status    String    @default("PLANNING") // PLANNING | OPEN | CLOSED | SOLD_OUT
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  event   Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tickets Ticket[]
+
+  @@index([tenantId, eventId])
+  @@index([tenantId, eventId, status])
+  @@map("ticket_batches")
+}
+
+/// Ticket - individual ticket unit generated from a batch
+model Ticket {
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  eventId  String  @map("event_id")
+  batchId  String  @map("batch_id")
+
+  code     String  @unique
+  price    Float
+  status   String  @default("AVAILABLE") // AVAILABLE | RESERVED | SOLD | USED | CANCELLED
+  holderId String? @map("holder_id")
+
+  reservedAt DateTime? @map("reserved_at")
+  soldAt     DateTime? @map("sold_at")
+  usedAt     DateTime? @map("used_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  event Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  batch TicketBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, eventId])
+  @@index([tenantId, eventId, status])
+  @@index([tenantId, batchId])
+  @@index([tenantId, holderId])
+  @@map("tickets")
+}
+
+/// Invitation - event invitation linked to tickets and members
+model Invitation {
+  id       String  @id @default(uuid())
+  tenantId String  @map("tenant_id")
+  eventId  String  @map("event_id")
+  ticketId String? @map("ticket_id")
+  batchId  String? @map("batch_id")
+
+  type   String @default("FREE")    // FREE | POINTS | PAID | HYBRID
+  status String @default("CREATED") // CREATED | SENT | ACCEPTED | DECLINED | EXPIRED | CANCELLED
+
+  // Recipient
+  recipientName  String  @map("recipient_name")
+  recipientEmail String? @map("recipient_email")
+  recipientPhone String? @map("recipient_phone")
+
+  // Issuer
+  issuedByMemberId String? @map("issued_by_member_id")
+  issuedByRole     String? @map("issued_by_role") // ADMIN | ORGANIZER | HOST
+
+  // Pricing
+  priceCurrency  String  @default("BRL") @map("price_currency")
+  priceAmount    Float   @default(0) @map("price_amount")
+  pointsRequired Int     @default(0) @map("points_required")
+  exchangeRateId String? @map("exchange_rate_id")
+
+  // Seat allocation
+  tableId    String?  @map("table_id")
+  seatId     String?  @map("seat_id")
+  seatLocked Boolean  @default(false) @map("seat_locked")
+
+  expiresAt       DateTime? @map("expires_at")
+  acceptedAt      DateTime? @map("accepted_at")
+  cancelledReason String?   @map("cancelled_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, eventId])
+  @@index([tenantId, eventId, status])
+  @@index([tenantId, status])
+  @@map("invitations")
+}
+
+/// InvitationPolicy - per-event invitation rules
+model InvitationPolicy {
+  id              String  @id @default(uuid())
+  tenantId        String  @map("tenant_id")
+  eventId         String  @unique @map("event_id")
+
+  allowedTypes    Json    @default("[\"FREE\",\"POINTS\",\"PAID\",\"HYBRID\"]") @map("allowed_types")
+  maxInvitations  Int     @default(100) @map("max_invitations")
+  allowPoints     Boolean @default(true) @map("allow_points")
+  allowHybrid     Boolean @default(true) @map("allow_hybrid")
+  allowedRoles    Json    @default("[\"ADMIN\",\"ORGANIZER\"]") @map("allowed_roles")
+  expirationHours Int     @default(72) @map("expiration_hours")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("invitation_policies")
+}
+
+/// InvitationAuditLog - audit trail for invitation lifecycle
+model InvitationAuditLog {
+  id           String @id @default(uuid())
+  tenantId     String @map("tenant_id")
+  invitationId String @map("invitation_id")
+
+  action      String // CREATED | SENT | ACCEPTED | DECLINED | EXPIRED | CANCELLED
+  performedBy String @map("performed_by") // SYSTEM | ADMIN | MEMBER
+  metadata    Json?
+
+  performedAt DateTime @default(now()) @map("performed_at")
+
+  @@index([tenantId, invitationId])
+  @@map("invitation_audit_logs")
 }

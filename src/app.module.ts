@@ -50,6 +50,9 @@ import { SystemModule } from './domains/system';
 // Member Journey Domain
 import { MemberJourneyModule } from './domains/member-journey';
 
+// Tickets Domain
+import { TicketsModule } from './domains/tickets/tickets.module';
+
 // MCP Domain (API Gateway + Tool Execution)
 import { McpModule } from './domains/mcp';
 
@@ -77,6 +80,7 @@ import { OutboxModule } from './common/outbox/outbox.module';
     SystemModule,
     MemberJourneyModule,
     McpModule,
+    TicketsModule,
   ],
   controllers: [ApprovalsController],
   providers: [
