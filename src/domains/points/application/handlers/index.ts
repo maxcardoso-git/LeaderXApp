@@ -11,3 +11,4 @@ export * from './list-ledger-entries.handler';
 export * from './get-ledger-entry.handler';
 export * from './get-member-balance.handler';
 export * from './conciliation.handler';
+export * from './points-policy.handler';

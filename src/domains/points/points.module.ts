@@ -40,10 +40,11 @@ import {
   GetLedgerEntryHandler,
   GetMemberBalanceHandler,
   ConciliationHandler,
+  PointsPolicyHandler,
 } from './application/handlers';
 
 // Inbound adapters (controllers)
-import { PointsController, PointsLedgerController, ConciliationController } from './inbound/controllers';
+import { PointsController, PointsLedgerController, ConciliationController, PointsPolicyController } from './inbound/controllers';
 
 const repositoryProviders = [
   {
@@ -94,10 +95,11 @@ const handlers = [
   GetLedgerEntryHandler,
   GetMemberBalanceHandler,
   ConciliationHandler,
+  PointsPolicyHandler,
 ];
 
 @Module({
-  controllers: [PointsController, PointsLedgerController, ConciliationController],
+  controllers: [PointsController, PointsLedgerController, ConciliationController, PointsPolicyController],
   providers: [
     PrismaService,
     ...repositoryProviders,

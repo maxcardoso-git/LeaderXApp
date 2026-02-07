@@ -944,6 +944,24 @@ model RegistrationBonusSettings {
   @@map("registration_bonus_settings")
 }
 
+/// PointsPolicy - versioned policy document for earning/bonus/spending rules
+model PointsPolicy {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  code      String   @default("GLOBAL_POINTS_POLICY")
+  name      String
+  version   Int      @default(1)
+  status    String   @default("ACTIVE") // ACTIVE | DEPRECATED
+  rules     Json     // earningRules, bonusRules, spendingRules, governance, ledgerIntegration
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdBy String?  @map("created_by")
+
+  @@unique([tenantId, code, version])
+  @@index([tenantId, status])
+  @@map("points_policies")
+}
+
 // ============================================
 // TAXONOMY DOMAIN
 // ============================================
