@@ -2452,3 +2452,23 @@ model MemberJourneyDefinition {
   @@index([tenantId, isActive])
   @@map("member_journey_definitions")
 }
+
+// ─── MCP Tool Execution Audit ─────────────────────────────────────────────────
+
+model McpToolExecution {
+  id              String   @id @default(uuid())
+  tenantId        String   @map("tenant_id")
+  toolCode        String   @map("tool_code")
+  agentId         String   @map("agent_id")
+  status          String   // SUCCESS, DENIED, ERROR
+  inputPayload    Json?    @map("input_payload")
+  outputPayload   Json?    @map("output_payload")
+  executionTimeMs Int      @map("execution_time_ms")
+  errorMessage    String?  @map("error_message")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("mcp_tool_executions")
+  @@index([tenantId])
+  @@index([toolCode])
+  @@index([createdAt])
+}

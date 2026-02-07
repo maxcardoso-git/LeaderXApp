@@ -50,6 +50,9 @@ import { SystemModule } from './domains/system';
 // Member Journey Domain
 import { MemberJourneyModule } from './domains/member-journey';
 
+// MCP Domain (API Gateway + Tool Execution)
+import { McpModule } from './domains/mcp';
+
 // Outbox Module (for background event processing)
 import { OutboxModule } from './common/outbox/outbox.module';
 
@@ -73,6 +76,7 @@ import { OutboxModule } from './common/outbox/outbox.module';
     PlmModule,
     SystemModule,
     MemberJourneyModule,
+    McpModule,
   ],
   controllers: [ApprovalsController],
   providers: [
