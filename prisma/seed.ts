@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -63,89 +64,102 @@ async function main() {
 
   console.log(`Created ${users.length} users`);
 
-  // Create demo permissions
-  const permissions = await Promise.all([
-    prisma.permission.upsert({
-      where: { tenantId_code: { tenantId: TENANT_ID, code: 'USERS.CREATE' } },
-      update: {},
-      create: {
-        tenantId: TENANT_ID,
-        code: 'USERS.CREATE',
-        name: 'Criar Usuários',
-        category: 'Users',
-      },
-    }),
-    prisma.permission.upsert({
-      where: { tenantId_code: { tenantId: TENANT_ID, code: 'USERS.READ' } },
-      update: {},
-      create: {
-        tenantId: TENANT_ID,
-        code: 'USERS.READ',
-        name: 'Visualizar Usuários',
-        category: 'Users',
-      },
-    }),
-    prisma.permission.upsert({
-      where: { tenantId_code: { tenantId: TENANT_ID, code: 'USERS.UPDATE' } },
-      update: {},
-      create: {
-        tenantId: TENANT_ID,
-        code: 'USERS.UPDATE',
-        name: 'Atualizar Usuários',
-        category: 'Users',
-      },
-    }),
-    prisma.permission.upsert({
-      where: { tenantId_code: { tenantId: TENANT_ID, code: 'USERS.DELETE' } },
-      update: {},
-      create: {
-        tenantId: TENANT_ID,
-        code: 'USERS.DELETE',
-        name: 'Excluir Usuários',
-        category: 'Users',
-      },
-    }),
-    prisma.permission.upsert({
-      where: { tenantId_code: { tenantId: TENANT_ID, code: 'ROLES.CREATE' } },
-      update: {},
-      create: {
-        tenantId: TENANT_ID,
-        code: 'ROLES.CREATE',
-        name: 'Criar Funções',
-        category: 'Roles',
-      },
-    }),
-    prisma.permission.upsert({
-      where: { tenantId_code: { tenantId: TENANT_ID, code: 'ROLES.READ' } },
-      update: {},
-      create: {
-        tenantId: TENANT_ID,
-        code: 'ROLES.READ',
-        name: 'Visualizar Funções',
-        category: 'Roles',
-      },
-    }),
-    prisma.permission.upsert({
-      where: { tenantId_code: { tenantId: TENANT_ID, code: 'ROLES.UPDATE' } },
-      update: {},
-      create: {
-        tenantId: TENANT_ID,
-        code: 'ROLES.UPDATE',
-        name: 'Atualizar Funções',
-        category: 'Roles',
-      },
-    }),
-    prisma.permission.upsert({
-      where: { tenantId_code: { tenantId: TENANT_ID, code: 'ROLES.DELETE' } },
-      update: {},
-      create: {
-        tenantId: TENANT_ID,
-        code: 'ROLES.DELETE',
-        name: 'Excluir Funções',
-        category: 'Roles',
-      },
-    }),
-  ]);
+  // Set admin password
+  const passwordHash = await bcrypt.hash('admin123', 10);
+  await prisma.identityUser.update({
+    where: { id: users[0].id },
+    data: { passwordHash },
+  });
+  console.log('Set admin password');
+
+  // ─── Permission Manifest ───────────────────────────────────────
+  const permissionsData = [
+    // Dashboard
+    { code: 'DASHBOARD.VIEW', name: 'Ver Dashboard', category: 'Dashboard' },
+    // Identity
+    { code: 'USERS.CREATE', name: 'Criar Usuários', category: 'Identity' },
+    { code: 'USERS.READ', name: 'Visualizar Usuários', category: 'Identity' },
+    { code: 'USERS.UPDATE', name: 'Atualizar Usuários', category: 'Identity' },
+    { code: 'USERS.DELETE', name: 'Excluir Usuários', category: 'Identity' },
+    { code: 'ROLES.CREATE', name: 'Criar Perfis', category: 'Identity' },
+    { code: 'ROLES.READ', name: 'Visualizar Perfis', category: 'Identity' },
+    { code: 'ROLES.UPDATE', name: 'Atualizar Perfis', category: 'Identity' },
+    { code: 'ROLES.DELETE', name: 'Excluir Perfis', category: 'Identity' },
+    { code: 'SESSIONS.READ', name: 'Visualizar Sessões', category: 'Identity' },
+    { code: 'SESSIONS.REVOKE', name: 'Revogar Sessões', category: 'Identity' },
+    // Network
+    { code: 'NETWORK.READ', name: 'Visualizar Rede', category: 'Network' },
+    { code: 'NETWORK.MANAGE', name: 'Gerenciar Rede', category: 'Network' },
+    { code: 'WORKING_UNITS.CREATE', name: 'Criar Unidades de Trabalho', category: 'Network' },
+    { code: 'WORKING_UNITS.READ', name: 'Visualizar Unidades de Trabalho', category: 'Network' },
+    { code: 'WORKING_UNITS.UPDATE', name: 'Atualizar Unidades de Trabalho', category: 'Network' },
+    { code: 'WORKING_UNITS.DELETE', name: 'Excluir Unidades de Trabalho', category: 'Network' },
+    { code: 'STRUCTURES.READ', name: 'Visualizar Estruturas', category: 'Network' },
+    { code: 'STRUCTURES.MANAGE', name: 'Gerenciar Estruturas', category: 'Network' },
+    // Events
+    { code: 'EVENTS.CREATE', name: 'Criar Eventos', category: 'Events' },
+    { code: 'EVENTS.READ', name: 'Visualizar Eventos', category: 'Events' },
+    { code: 'EVENTS.UPDATE', name: 'Atualizar Eventos', category: 'Events' },
+    { code: 'EVENTS.DELETE', name: 'Excluir Eventos', category: 'Events' },
+    { code: 'EVENTS.MANAGE', name: 'Gerenciar Eventos', category: 'Events' },
+    { code: 'TICKETS.READ', name: 'Visualizar Ingressos', category: 'Events' },
+    { code: 'TICKETS.MANAGE', name: 'Gerenciar Ingressos', category: 'Events' },
+    // Cadastros
+    { code: 'SUPPLIERS.CREATE', name: 'Criar Fornecedores', category: 'Cadastros' },
+    { code: 'SUPPLIERS.READ', name: 'Visualizar Fornecedores', category: 'Cadastros' },
+    { code: 'SUPPLIERS.UPDATE', name: 'Atualizar Fornecedores', category: 'Cadastros' },
+    { code: 'SUPPLIERS.DELETE', name: 'Excluir Fornecedores', category: 'Cadastros' },
+    { code: 'EVENT_VENUES.CREATE', name: 'Criar Locais de Evento', category: 'Cadastros' },
+    { code: 'EVENT_VENUES.READ', name: 'Visualizar Locais de Evento', category: 'Cadastros' },
+    { code: 'EVENT_VENUES.UPDATE', name: 'Atualizar Locais de Evento', category: 'Cadastros' },
+    { code: 'EVENT_VENUES.DELETE', name: 'Excluir Locais de Evento', category: 'Cadastros' },
+    // Settings (Taxonomy)
+    { code: 'SETTINGS.READ', name: 'Visualizar Configurações', category: 'Settings' },
+    { code: 'SETTINGS.MANAGE', name: 'Gerenciar Configurações', category: 'Settings' },
+    // Points
+    { code: 'POINTS_LEDGER.READ', name: 'Visualizar Ledger de Pontos', category: 'Points' },
+    { code: 'POINTS_POLICY.READ', name: 'Visualizar Política de Pontos', category: 'Points' },
+    { code: 'POINTS_POLICY.MANAGE', name: 'Gerenciar Política de Pontos', category: 'Points' },
+    { code: 'POINTS_QUOTATION.READ', name: 'Visualizar Cotação de Pontos', category: 'Points' },
+    { code: 'POINTS_QUOTATION.MANAGE', name: 'Gerenciar Cotação de Pontos', category: 'Points' },
+    { code: 'POINTS_SIMULATOR.READ', name: 'Usar Simulador de Pontos', category: 'Points' },
+    { code: 'CONCILIATION.READ', name: 'Visualizar Conciliação', category: 'Points' },
+    { code: 'CONCILIATION.MANAGE', name: 'Gerenciar Conciliação', category: 'Points' },
+    // System
+    { code: 'RESOURCES.READ', name: 'Visualizar Recursos', category: 'System' },
+    { code: 'RESOURCES.MANAGE', name: 'Gerenciar Recursos', category: 'System' },
+    { code: 'CAPABILITIES.READ', name: 'Visualizar Capacidades', category: 'System' },
+    { code: 'CAPABILITIES.MANAGE', name: 'Gerenciar Capacidades', category: 'System' },
+    { code: 'APPEARANCE.MANAGE', name: 'Gerenciar Aparência', category: 'System' },
+    { code: 'FORM_STUDIO.READ', name: 'Visualizar Form Studio', category: 'System' },
+    { code: 'FORM_STUDIO.MANAGE', name: 'Gerenciar Form Studio', category: 'System' },
+    { code: 'API_MANAGER.READ', name: 'Visualizar API Manager', category: 'System' },
+    { code: 'API_MANAGER.MANAGE', name: 'Gerenciar API Manager', category: 'System' },
+    // Governance
+    { code: 'APPROVAL_POLICIES.READ', name: 'Visualizar Políticas de Aprovação', category: 'Governance' },
+    { code: 'APPROVAL_POLICIES.MANAGE', name: 'Gerenciar Políticas de Aprovação', category: 'Governance' },
+    { code: 'WORKFLOW.READ', name: 'Visualizar Workflows', category: 'Governance' },
+    { code: 'WORKFLOW.MANAGE', name: 'Gerenciar Workflows', category: 'Governance' },
+    { code: 'PIPELINES.READ', name: 'Visualizar Pipelines', category: 'Governance' },
+    { code: 'PIPELINES.MANAGE', name: 'Gerenciar Pipelines', category: 'Governance' },
+    { code: 'MEMBER_JOURNEYS.READ', name: 'Visualizar Jornadas', category: 'Governance' },
+    { code: 'MEMBER_JOURNEYS.MANAGE', name: 'Gerenciar Jornadas', category: 'Governance' },
+    // Audit
+    { code: 'AUDIT_LOGS.READ', name: 'Visualizar Logs de Auditoria', category: 'Audit' },
+    { code: 'COMPLIANCE.READ', name: 'Visualizar Compliance', category: 'Audit' },
+    // Notifications
+    { code: 'NOTIFICATIONS.READ', name: 'Visualizar Notificações', category: 'Notifications' },
+  ];
+
+  const permissions = await Promise.all(
+    permissionsData.map((p) =>
+      prisma.permission.upsert({
+        where: { tenantId_code: { tenantId: TENANT_ID, code: p.code } },
+        update: { name: p.name, category: p.category },
+        create: { tenantId: TENANT_ID, code: p.code, name: p.name, category: p.category },
+      })
+    )
+  );
 
   console.log(`Created ${permissions.length} permissions`);
 
@@ -187,6 +201,41 @@ async function main() {
   });
 
   console.log('Created 3 roles');
+
+  // Assign ALL permissions to ADMIN role
+  for (const perm of permissions) {
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: adminRole.id, permissionId: perm.id } },
+      update: {},
+      create: { roleId: adminRole.id, permissionId: perm.id, effect: 'ALLOW' },
+    });
+  }
+  console.log(`Assigned ${permissions.length} permissions to ADMIN role`);
+
+  // MANAGER: Operations + Cadastros + Events + Points + Governance (no System/Identity/Audit)
+  const managerCodes = permissionsData
+    .filter((p) => ['Events', 'Cadastros', 'Network', 'Points', 'Governance', 'Settings', 'Dashboard', 'Notifications'].includes(p.category))
+    .map((p) => p.code);
+  const managerPerms = permissions.filter((p) => managerCodes.includes(p.code));
+  for (const perm of managerPerms) {
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: managerRole.id, permissionId: perm.id } },
+      update: {},
+      create: { roleId: managerRole.id, permissionId: perm.id, effect: 'ALLOW' },
+    });
+  }
+  console.log(`Assigned ${managerPerms.length} permissions to MANAGER role`);
+
+  // VIEWER: Only READ/VIEW permissions
+  const viewerPerms = permissions.filter((p) => p.code.endsWith('.READ') || p.code.endsWith('.VIEW'));
+  for (const perm of viewerPerms) {
+    await prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: viewerRole.id, permissionId: perm.id } },
+      update: {},
+      create: { roleId: viewerRole.id, permissionId: perm.id, effect: 'ALLOW' },
+    });
+  }
+  console.log(`Assigned ${viewerPerms.length} permissions to VIEWER role`);
 
   // Assign admin role to first user
   await prisma.accessAssignment.upsert({

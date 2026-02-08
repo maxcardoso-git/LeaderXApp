@@ -56,6 +56,9 @@ import { TicketsModule } from './domains/tickets/tickets.module';
 // MCP Domain (API Gateway + Tool Execution)
 import { McpModule } from './domains/mcp';
 
+// Auth Domain
+import { AuthModule } from './domains/auth/auth.module';
+
 // Outbox Module (for background event processing)
 import { OutboxModule } from './common/outbox/outbox.module';
 
@@ -81,6 +84,7 @@ import { OutboxModule } from './common/outbox/outbox.module';
     MemberJourneyModule,
     McpModule,
     TicketsModule,
+    AuthModule,
   ],
   controllers: [ApprovalsController],
   providers: [
