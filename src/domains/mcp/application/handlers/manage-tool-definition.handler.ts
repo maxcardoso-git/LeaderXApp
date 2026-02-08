@@ -114,6 +114,24 @@ export class ManageToolDefinitionHandler {
     };
   }
 
+  async unpublish(id: string, userId: string): Promise<McpToolDefinitionAggregate> {
+    const tool = await this.repo.findById(id);
+    if (!tool) {
+      throw new HttpException({ error: 'NOT_FOUND' }, HttpStatus.NOT_FOUND);
+    }
+
+    if (tool.status !== 'PUBLISHED') {
+      throw new HttpException(
+        { error: 'INVALID_STATUS', message: 'Only PUBLISHED tools can be unpublished' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const updated = await this.repo.updateStatus(id, 'DRAFT', userId);
+    await this.registry.reloadPublishedTools();
+    return updated;
+  }
+
   async deprecate(id: string, userId: string): Promise<McpToolDefinitionAggregate> {
     const tool = await this.repo.findById(id);
     if (!tool) {

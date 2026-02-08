@@ -79,6 +79,16 @@ export class ToolDefinitionsController {
     return this.handler.publish(id, tenantId, userId || 'system');
   }
 
+  @Post(':id/unpublish')
+  @ApiOperation({ summary: 'Revert published tool to DRAFT for editing' })
+  @ApiHeader({ name: 'X-User-Id', required: true })
+  async unpublish(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId: string,
+  ) {
+    return this.handler.unpublish(id, userId || 'system');
+  }
+
   @Post(':id/deprecate')
   @ApiOperation({ summary: 'Deprecate a published tool' })
   @ApiHeader({ name: 'X-User-Id', required: true })
